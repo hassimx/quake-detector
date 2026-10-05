@@ -4,7 +4,9 @@
     .venv/bin/uvicorn server.app:create_app --factory --port 8000
 Настройки через переменные окружения:
     QUAKE_DB            путь к файлу базы (по умолчанию server/quake.db)
-    QUAKE_MIN_STATIONS  сколько станций нужно для подтверждения (по умолчанию 2)
+    QUAKE_MIN_STATIONS  сколько станций нужно для подтверждения события
+                        (по умолчанию 3; в шаге 14 при 3 было 0.21 ложных
+                        событий в час против 0.50 при 2)
 """
 
 import json
@@ -22,6 +24,7 @@ from server.network import link_alarm
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB = os.path.join(HERE, "quake.db")
 STATIONS_FILE = os.path.join(HERE, "stations.json")
+DEFAULT_MIN_STATIONS = 3  # по результатам шага 14 (results/step14_output.txt)
 
 
 class Chunk(BaseModel):
@@ -37,7 +40,8 @@ def iso(ts):
 
 def create_app(db_path=None, min_stations=None):
     db_path = db_path or os.environ.get("QUAKE_DB", DEFAULT_DB)
-    min_stations = min_stations or int(os.environ.get("QUAKE_MIN_STATIONS", 2))
+    min_stations = min_stations or int(
+        os.environ.get("QUAKE_MIN_STATIONS", DEFAULT_MIN_STATIONS))
     db = Database(db_path)
     with open(STATIONS_FILE, encoding="utf-8") as f:
         for s in json.load(f):

@@ -12,7 +12,9 @@ from obspy import UTCDateTime, read
 
 from server import replay
 from server.app import create_app
+from server.db import Database
 from server.detector import StreamDetector
+from server.network import link_alarm
 from step11 import analyze
 from step13 import cache_path
 
@@ -22,9 +24,13 @@ needs_data = pytest.mark.skipif(
     reason="нет data/: сначала запустите step13.py")
 
 
-@pytest.fixture
-def client(tmp_path):
-    return TestClient(create_app(str(tmp_path / "t.db"), min_stations=2))
+@pytest.fixture(params=[2, 3])
+def client(request, tmp_path):
+    """Сервер с порогом подтверждения 2 и 3 станции (тесты идут для обоих)."""
+    app = create_app(str(tmp_path / "t.db"), min_stations=request.param)
+    c = TestClient(app)
+    c.min_stations = request.param
+    return c
 
 
 def chunk(start, samples, fs=20.0):
@@ -38,7 +44,36 @@ def test_unknown_station(client):
 
 def test_stations_and_config(client):
     assert len(client.get("/api/stations").json()) == 5
-    assert client.get("/api/config").json() == dict(min_stations=2)
+    assert client.get("/api/config").json() == dict(
+        min_stations=client.min_stations)
+
+
+def test_default_min_stations_is_3(tmp_path, monkeypatch):
+    monkeypatch.delenv("QUAKE_MIN_STATIONS", raising=False)
+    c = TestClient(create_app(str(tmp_path / "a.db")))
+    assert c.get("/api/config").json() == dict(min_stations=3)
+
+
+def test_min_stations_from_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUAKE_MIN_STATIONS", "2")
+    c = TestClient(create_app(str(tmp_path / "b.db")))
+    assert c.get("/api/config").json() == dict(min_stations=2)
+
+
+@pytest.mark.parametrize("need", [2, 3])
+def test_rule_needs_enough_stations(tmp_path, need):
+    """Две станции подтверждают событие только при пороге 2, три при пороге 3."""
+    db = Database(str(tmp_path / "r.db"))
+    t = 1_000_000.0
+    status = []
+    for i, station in enumerate(["IU.MAJO", "JP.JGF", "G.INU"]):
+        alarm = db.add_alarm(station, t + 20 * i, 10.0)
+        event = link_alarm(db, alarm, station, t + 20 * i, need)
+        status.append(db.events()[0]["status"] if event else None)
+    # после 1-й тревоги события нет, после 2-й и 3-й смотрим статус
+    assert status[0] is None
+    assert status[1] == ("confirmed" if need == 2 else "candidate")
+    assert status[2] == "confirmed"
 
 
 @needs_data
