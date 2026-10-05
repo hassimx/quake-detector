@@ -1,1 +1,2 @@
 Detector (STA/LTA, single station, threshold 10): detected 10/10 earthquakes (M5.8-6.0, Japan), median delay 48.5 s; ~1.6 false alarms per hour in quiet periods (limitation: single station, small sample).
+Alarms in quiet periods: of 4 inspected, one looks like a sharp local transient (likely not seismic), one looks like a small real event missing from the USGS catalog. Verification with neighboring stations in progress.
