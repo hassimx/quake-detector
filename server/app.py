@@ -100,4 +100,5 @@ def create_app(db_path=None, min_stations=None):
                            UTCDateTime(end).timestamp, max_points)
         return dict(station=station, times=[iso(x) for x in t], values=v)
 
+    app.state.db = db  # чтобы скрипты (evaluate.py) могли закрыть базу
     return app
