@@ -1,0 +1,32 @@
+# Виртуальное окружение (его не коммитят: оно пересоздаётся из requirements.txt)
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Тесты и кэши
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE и система
+.vscode/
+.idea/
+.DS_Store
+
+# Переменные окружения и секреты
+.env
+
+# Картинки, которые создают скрипты (получаются заново при запуске)
+step1.png
+tohoku_2011.png
