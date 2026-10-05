@@ -1,0 +1,1 @@
+Detector (STA/LTA, single station, threshold 10): detected 10/10 earthquakes (M5.8-6.0, Japan), median delay 48.5 s; ~1.6 false alarms per hour in quiet periods (limitation: single station, small sample).
