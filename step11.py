@@ -144,7 +144,13 @@ def fetch_trace(client, key, channel, start, end):
     """
     net, sta = key.split(".")
     try:
-        st = client.get_waveforms(net, sta, "*", channel, start, end)
+        # Как в step2/step7: сначала location "00", если нет — любой ("*").
+        # Иначе у MAJO выбралась бы другая запись (10.BHZ, 40 Гц), а не та,
+        # на которой делался детектор (00.BHZ, 20 Гц).
+        try:
+            st = client.get_waveforms(net, sta, "00", channel, start, end)
+        except FDSNNoDataException:
+            st = client.get_waveforms(net, sta, "*", channel, start, end)
         st.merge(fill_value=0)              # как в step7: дыры заполняем нулями
         tr = max(st, key=lambda t: t.stats.npts)  # самая длинная трасса
     except FDSNNoDataException:
@@ -308,6 +314,11 @@ def main():
                 report.line(f"{head}: не сработала, пик STA/LTA в окне "
                             f"+-{MATCH_SEC} с = {peak} (порог {ON_THR})")
                 status[key] = "нет"
+            # Все срабатывания станции в 5-минутной записи (сек от тревоги
+            # MAJO), в том числе вне окна +-60 с: так видно, почему "нет".
+            own = ", ".join(f"{round(a - alarm):+d}" for a in alarms) or "нет"
+            report.line(f"      все срабатывания станции в записи, сек от "
+                        f"тревоги MAJO: {own}")
             rows.append(dict(key=key, tr=tr_f, alarms=alarms, note=""))
 
         stamp = alarm.strftime("%Y%m%dT%H%M%S")
