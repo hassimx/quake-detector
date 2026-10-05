@@ -73,6 +73,15 @@ through the server as if it were live) and `results/step13_output.txt`.
 - `requirements.txt` for the research scripts, `requirements-server.txt` for
   the backend.
 
+## Quick demo (Windows)
+
+Double-click `run_demo.bat`. On the first run it creates a virtual environment,
+installs the libraries and downloads the neighbor-station records (internet and
+Python 3.10+ are needed once). Then it starts the server in a separate window,
+opens http://127.0.0.1:8000 in your browser and replays the 2021-10-07
+earthquake at 60x speed, so you can watch the events appear on the map. When you
+are done, close the server window ("Quake Detector SERVER").
+
 Quick start (Linux/macOS; on Windows use `.venv\Scripts\python`):
 
     python -m venv .venv
