@@ -109,7 +109,11 @@ def wilson(k, n, z=1.96):
 
 
 def _poisson_cdf(k, mu):
-    return sum(math.exp(-mu) * mu ** i / math.factorial(i) for i in range(k + 1))
+    # через логарифмы: при больших k mu**i и i! не помещаются в float
+    if mu <= 0:
+        return 1.0
+    return min(1.0, sum(math.exp(-mu + i * math.log(mu) - math.lgamma(i + 1))
+                        for i in range(k + 1)))
 
 
 def poisson_ci(k, alpha=0.05):
