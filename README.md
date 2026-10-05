@@ -67,6 +67,8 @@ through the server as if it were live) and `results/step13_output.txt`.
   holds the detector code reused by everything else.
 - `server/` - backend: streaming detector, network rule, SQLite storage, HTTP
   API, replay of recorded files, and the step 14 evaluation (`server/README.md`).
+- `web/index.html` - single-page UI served by the backend at `/`: map, confirmed
+  events, per-station signal plots, auto-refresh every 2 s.
 - `results/` - saved outputs of the steps, including `step14_output.txt`.
 - `requirements.txt` for the research scripts, `requirements-server.txt` for
   the backend.

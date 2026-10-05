@@ -14,6 +14,7 @@ import os
 import threading
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from obspy import UTCDateTime
 from pydantic import BaseModel
 
@@ -24,6 +25,7 @@ from server.network import link_alarm
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB = os.path.join(HERE, "quake.db")
 STATIONS_FILE = os.path.join(HERE, "stations.json")
+INDEX_FILE = os.path.join(HERE, "..", "web", "index.html")  # страница для браузера
 DEFAULT_MIN_STATIONS = 3  # по результатам шага 14 (results/step14_output.txt)
 
 
@@ -52,6 +54,11 @@ def create_app(db_path=None, min_stations=None):
     lock = threading.Lock()
 
     app = FastAPI(title="quake-detector")
+
+    @app.get("/", include_in_schema=False)
+    def index():
+        """Веб-страница с картой и списком событий (web/index.html)."""
+        return FileResponse(INDEX_FILE, media_type="text/html")
 
     @app.get("/api/config")
     def config():

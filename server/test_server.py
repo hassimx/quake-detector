@@ -103,3 +103,33 @@ def test_quake_is_confirmed_and_db_filled(client):
         station="IU.MAJO", start="2021-10-07T13:41:00",
         end="2021-10-07T13:43:00")).json()
     assert w["values"]
+
+
+def test_index_page(client):
+    """Корень сервера отдаёт веб-страницу, которая ходит в нужные API."""
+    r = client.get("/")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    for text in ("leaflet", "/api/stations", "/api/events?status=confirmed",
+                 "/api/waveform", "How it works"):
+        assert text in r.text
+
+
+@needs_data
+def test_page_data_after_replay(client):
+    """После replay есть всё, что рисует страница: станции, события, сигнал."""
+    replay.run("quake:2021-10-07", client, verbose=False)
+    assert client.get("/").status_code == 200
+    stations = client.get("/api/stations").json()
+    assert all({"code", "name", "lat", "lon"} <= set(s) for s in stations)
+    events = client.get("/api/events", params=dict(status="confirmed")).json()
+    assert events
+    ev = events[0]
+    assert {"id", "t_first", "t_last", "n_stations", "alarms"} <= set(ev)
+    assert all({"station", "time"} <= set(a) for a in ev["alarms"])
+    names = {s["code"] for s in stations}
+    assert {a["station"] for a in ev["alarms"]} <= names
+    w = client.get("/api/waveform", params=dict(
+        station=ev["alarms"][0]["station"], start=ev["t_first"],
+        end=ev["t_last"], max_points=1500)).json()
+    assert len(w["times"]) == len(w["values"]) > 0

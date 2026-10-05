@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quake Detector - live network view</title>
+<!-- Leaflet с cdnjs: единственная внешняя библиотека; графики сигналов рисуем сами (SVG) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  /* Цвета и размеры в одном месте */
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --text: #1f2933; --muted: #6b7785;
+    --line: #dde1e6; --accent: #1c7ed6; --fresh: #e8590c; --ok: #2b8a3e;
+    --bad: #c92a2a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+           padding: 12px 20px; background: var(--panel);
+           border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; }
+  header .sub { color: var(--muted); }
+  header .spacer { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+          border: 1px solid var(--line); border-radius: 999px; background: #fafbfc;
+          font-size: 13px; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.live .dot { background: var(--ok); }
+  .pill.down .dot { background: var(--bad); }
+  header a { color: var(--accent); text-decoration: none; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 12px;
+         padding: 12px; height: calc(100vh - 130px); min-height: 520px; }
+  .card { background: var(--panel); border: 1px solid var(--line);
+          border-radius: 8px; overflow: hidden; }
+  #map-wrap { position: relative; }
+  #map { position: absolute; inset: 0; background: #dfe6ee; }
+  #map-msg { position: absolute; inset: 0; display: none; align-items: center;
+             justify-content: center; text-align: center; padding: 20px;
+             color: var(--muted); z-index: 500; pointer-events: none; }
+  .legend { position: absolute; left: 10px; bottom: 10px; z-index: 600;
+            background: rgba(255,255,255,.92); border: 1px solid var(--line);
+            border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+  .legend div { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+  .sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid; }
+  aside { display: grid; grid-template-rows: minmax(120px, 38%) minmax(0, 1fr);
+          gap: 12px; min-height: 0; }
+  .panel-title { padding: 8px 12px; font-weight: 600;
+                 border-bottom: 1px solid var(--line); display: flex;
+                 justify-content: space-between; gap: 8px; }
+  .panel-title span { font-weight: 400; color: var(--muted); }
+  .panel { display: flex; flex-direction: column; min-height: 0; }
+  .scroll { overflow: auto; flex: 1; min-height: 0; }
+  #events { list-style: none; margin: 0; padding: 0; }
+  #events li { padding: 8px 12px; border-bottom: 1px solid var(--line);
+               cursor: pointer; border-left: 4px solid transparent; }
+  #events li:hover { background: #f1f4f8; }
+  #events li.sel { background: #e7f1fb; border-left-color: var(--accent); }
+  #events li.fresh { border-left-color: var(--fresh); }
+  #events .t { font-weight: 600; font-variant-numeric: tabular-nums; }
+  #events .n { color: var(--muted); }
+  #events .s { color: var(--muted); font-size: 12px; }
+  .badge-new { background: var(--fresh); color: #fff; font-size: 11px;
+               padding: 1px 6px; border-radius: 999px; margin-left: 6px; }
+  .empty { padding: 16px 12px; color: var(--muted); }
+  .empty code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; }
+  #wave svg { display: block; width: 100%; height: auto; }
+  #wave .note { padding: 6px 12px; color: var(--muted); font-size: 12px; }
+  section.how { margin: 0 12px 24px; padding: 16px 20px; }
+  section.how h2 { margin: 0 0 8px; font-size: 16px; }
+  section.how .cols { display: grid; gap: 16px;
+                      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  section.how h3 { margin: 0 0 4px; font-size: 14px; }
+  section.how p { margin: 0 0 8px; }
+  .nums { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; }
+  .num { background: #f1f4f8; border-radius: 8px; padding: 8px 14px; }
+  .num b { display: block; font-size: 20px; }
+  .num span { color: var(--muted); font-size: 12px; }
+  .caveat { color: var(--muted); font-size: 12px; }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; height: auto; }
+    #map-wrap { height: 380px; }
+    aside { grid-template-rows: auto auto; }
+    #events-card .scroll { max-height: 240px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Quake Detector</h1>
+  <span class="sub">Live network view: Japan, 5 seismic stations</span>
+  <span class="spacer"></span>
+  <span class="pill" id="rule" title="Network confirmation rule">Rule: loading...</span>
+  <span class="pill" id="status"><span class="dot"></span><span id="status-text">connecting...</span></span>
+  <a href="#how">How it works</a>
+</header>
+
+<main>
+  <div class="card" id="map-wrap">
+    <div id="map"></div>
+    <div id="map-msg">The map library could not be loaded (no internet?).<br>
+      The event list and signal plots still work.</div>
+    <div class="legend">
+      <div><span class="sw" style="border-color:#495057;background:#495057"></span> station</div>
+      <div><span class="sw" style="border-color:var(--fresh);background:rgba(232,89,12,.3)"></span> new confirmed event (last 30 s)</div>
+      <div><span class="sw" style="border-color:var(--accent);background:rgba(28,126,214,.25)"></span> earlier confirmed event</div>
+    </div>
+  </div>
+
+  <aside>
+    <div class="card panel" id="events-card">
+      <div class="panel-title">Confirmed events <span id="count"></span></div>
+      <div class="scroll"><ul id="events"></ul></div>
+    </div>
+    <div class="card panel">
+      <div class="panel-title">Signals <span id="wave-title">select an event</span></div>
+      <div class="scroll" id="wave"><div class="empty">Click an event in the list to see the signal of every station around that time.</div></div>
+    </div>
+  </aside>
+</main>
+
+<section class="card how" id="how">
+  <h2>How it works</h2>
+  <div class="cols">
+    <div>
+      <h3>1. Each station: STA/LTA</h3>
+      <p>Every station's signal is filtered to 1-8 Hz, where earthquake waves are
+         strong. The detector compares the average signal level over the last
+         <b>1 second</b> (STA, short term) with the average over the last
+         <b>30 seconds</b> (LTA, long term). Quiet noise gives a ratio near 1;
+         when the ratio exceeds <b>10</b>, the station raises an alarm.</p>
+    </div>
+    <div>
+      <h3>2. Network: at least 3 stations within 60 s</h3>
+      <p>A single station can be fooled by a local disturbance (a truck, wind, a
+         sensor glitch). An earthquake is seen by several stations at once. So
+         alarms from different stations less than 60 s apart are grouped into
+         one event, and the event is <b>confirmed only if at least 3 of the 5
+         stations</b> alarmed. This page shows confirmed events only.</p>
+    </div>
+    <div>
+      <h3>3. Results so far</h3>
+      <div class="nums">
+        <div class="num"><b>10 / 10</b><span>earthquakes confirmed (M5.8-6.0)</span></div>
+        <div class="num"><b>0.21 / h</b><span>false events, network (3 of 5)</span></div>
+        <div class="num"><b>0.75 / h</b><span>false alarms, one station</span></div>
+      </div>
+      <p class="caveat">24 random quiet hours, 2016-2024. The same data was used
+         to choose the rule and to test it, the sample is small, and weaker
+         earthquakes (M5.0-5.6) have not been tested.</p>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+
+// ---------- Настройки ----------
+const REFRESH_MS = 2000;      // как часто опрашиваем сервер
+const FRESH_MS = 30000;       // событие "новое", если страница увидела его < 30 с назад
+const CIRCLE_RADIUS_M = 22000; // радиус круга вокруг станции, увидевшей событие
+const COLOR_FRESH = "#e8590c", COLOR_OLD = "#1c7ed6";
+const REFERENCE_STATION = "IU.MAJO";
+
+// ---------- Состояние ----------
+const state = {
+  stations: [],            // из /api/stations
+  events: [],              // подтверждённые события, новые сверху
+  firstSeen: new Map(),    // id события -> когда страница его впервые увидела (мс)
+  selected: null,          // id выбранного события
+  signature: "",           // отпечаток списка событий: перерисовываем, только если он изменился
+  firstTick: true,
+  waveToken: 0,            // чтобы поздний ответ не затирал более новый выбор
+};
+const hasMap = typeof L !== "undefined";
+let map = null;
+const eventLayers = new Map(); // id события -> массив кругов на карте
+
+// ---------- Вспомогательные ----------
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Сервер отдаёт время вида 2021-10-07T13:41:12.345678Z; у Date.parse надёжны только мс.
+const toMs = (iso) => Date.parse(iso.replace(/(\.\d{3})\d*/, "$1"));
+const fmtUtc = (ms) => new Date(ms).toISOString().replace("T", " ").slice(0, 19);
+const fmtClock = (ms) => new Date(ms).toISOString().slice(11, 19);
+
+async function getJSON(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(url + " -> " + r.status);
+  return r.json();
+}
+
+function setStatus(ok, text) {
+  const el = $("status");
+  el.className = "pill " + (ok ? "live" : "down");
+  $("status-text").textContent = text;
+}
+
+const isFresh = (ev) => Date.now() - (state.firstSeen.get(ev.id) || 0) < FRESH_MS;
+const stationsOf = (ev) => [...new Set(ev.alarms.map((a) => a.station))];
+
+// ---------- Карта ----------
+function initMap() {
+  if (!hasMap) { $("map-msg").style.display = "flex"; return; }
+  map = L.map("map", { zoomControl: true }).setView([36.5, 138.3], 6);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 12,
+    attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+  const pts = [];
+  for (const s of state.stations) {
+    const ref = s.code === REFERENCE_STATION;
+    L.circleMarker([s.lat, s.lon], {
+      radius: ref ? 8 : 6, color: "#fff", weight: 2,
+      fillColor: ref ? "#2b8a3e" : "#495057", fillOpacity: 1,
+    }).bindTooltip(`${esc(s.code)} - ${esc(s.name)}${ref ? " (reference)" : ""}`)
+      .addTo(map);
+    pts.push([s.lat, s.lon]);
+  }
+  if (pts.length) map.fitBounds(pts, { padding: [90, 90], maxZoom: 7 });
+}
+
+function stationByCode(code) { return state.stations.find((s) => s.code === code); }
+
+// Круги вокруг станций, которые увидели событие
+function drawEventLayers(ev) {
+  if (!hasMap) return;
+  const layers = [];
+  for (const code of stationsOf(ev)) {
+    const st = stationByCode(code);
+    if (!st) continue;
+    const c = L.circle([st.lat, st.lon], { radius: CIRCLE_RADIUS_M, weight: 2 });
+    c.bindTooltip(`${fmtUtc(toMs(ev.t_first))} UTC - ${esc(code)}`);
+    c.on("click", () => selectEvent(ev.id, true));
+    c.addTo(map);
+    layers.push(c);
+  }
+  eventLayers.set(ev.id, layers);
+}
+
+function styleLayers() {
+  if (!hasMap) return;
+  for (const ev of state.events) {
+    const sel = ev.id === state.selected;
+    const color = isFresh(ev) ? COLOR_FRESH : COLOR_OLD;
+    for (const c of eventLayers.get(ev.id) || []) {
+      c.setStyle({
+        color: sel ? "#212529" : color, fillColor: color,
+        weight: sel ? 3 : 2, fillOpacity: sel ? 0.45 : 0.25,
+      });
+      c.setRadius(sel ? CIRCLE_RADIUS_M * 1.4 : CIRCLE_RADIUS_M); // выбранное событие крупнее
+      if (sel) c.bringToFront();
+    }
+  }
+}
+
+function syncMapLayers() {
+  if (!hasMap) return;
+  const ids = new Set(state.events.map((e) => e.id));
+  for (const [id, layers] of eventLayers) {
+    if (!ids.has(id)) { layers.forEach((l) => l.remove()); eventLayers.delete(id); }
+  }
+  for (const ev of state.events) {
+    // событие могло получить новые станции: перерисовываем его круги
+    const have = (eventLayers.get(ev.id) || []).length;
+    if (have !== stationsOf(ev).filter(stationByCode).length) {
+      (eventLayers.get(ev.id) || []).forEach((l) => l.remove());
+      drawEventLayers(ev);
+    }
+  }
+}
+
+// ---------- Список событий ----------
+function renderList() {
+  const ul = $("events");
+  $("count").textContent = state.events.length ? `(${state.events.length})` : "";
+  if (!state.events.length) {
+    ul.innerHTML = '<li class="empty" style="cursor:default;border:0">No confirmed events yet.<br>' +
+      'Start a replay in another window:<br><code>.venv\\Scripts\\python -m server.replay quake:2021-10-07 --speed 60</code></li>';
+    return;
+  }
+  ul.innerHTML = state.events.map((ev) => {
+    const names = stationsOf(ev);
+    return `<li data-id="${ev.id}">` +
+      `<div><span class="t">${fmtUtc(toMs(ev.t_first))} UTC</span>` +
+      `<span class="badge-new" hidden>NEW</span></div>` +
+      `<div class="n">${names.length} stations</div>` +
+      `<div class="s">${names.map(esc).join(", ")}</div></li>`;
+  }).join("");
+  ul.querySelectorAll("li[data-id]").forEach((li) => {
+    li.addEventListener("click", () => selectEvent(Number(li.dataset.id), true));
+  });
+}
+
+// Цвета "новое/старое" и выделение обновляем на месте, без перестройки списка
+function updateFreshness() {
+  document.querySelectorAll("#events li[data-id]").forEach((li) => {
+    const ev = state.events.find((e) => e.id === Number(li.dataset.id));
+    if (!ev) return;
+    const fresh = isFresh(ev);
+    li.classList.toggle("fresh", fresh);
+    li.classList.toggle("sel", ev.id === state.selected);
+    li.querySelector(".badge-new").hidden = !fresh;
+  });
+  styleLayers();
+}
+
+// ---------- Графики сигналов (SVG, без библиотек) ----------
+async function selectEvent(id, pan) {
+  const ev = state.events.find((e) => e.id === id);
+  if (!ev) return;
+  state.selected = id;
+  updateFreshness();
+  if (pan && hasMap) {
+    const pts = stationsOf(ev).map(stationByCode).filter(Boolean).map((s) => [s.lat, s.lon]);
+    if (pts.length) map.fitBounds(pts, { padding: [90, 90], maxZoom: 8 });
+  }
+  await loadWaveforms(ev);
+}
+
+async function loadWaveforms(ev) {
+  const token = ++state.waveToken;
+  const t0 = toMs(ev.t_first), t1 = toMs(ev.t_last);
+  const start = t0 - 60000, end = Math.max(t1 + 120000, t0 + 240000);
+  $("wave-title").textContent = fmtUtc(t0) + " UTC";
+  $("wave").innerHTML = '<div class="empty">Loading signals...</div>';
+  const rows = await Promise.all(state.stations.map(async (st) => {
+    const q = `/api/waveform?station=${encodeURIComponent(st.code)}` +
+      `&start=${encodeURIComponent(new Date(start).toISOString())}` +
+      `&end=${encodeURIComponent(new Date(end).toISOString())}&max_points=1500`;
+    try {
+      const w = await getJSON(q);
+      return { st, times: w.times.map(toMs), values: w.values };
+    } catch (e) { return { st, times: [], values: [], error: true }; }
+  }));
+  if (token !== state.waveToken) return; // пока грузили, выбрали другое событие
+  // Если записи кончаются раньше окна (например, replay дошёл только досюда),
+  // обрезаем ось времени по последнему отсчёту, чтобы графики не были пустыми справа.
+  const lasts = rows.filter((r) => r.times.length).map((r) => r.times[r.times.length - 1]);
+  const plotEnd = lasts.length ? Math.min(end, Math.max(Math.max(...lasts), t1 + 30000)) : end;
+  $("wave").innerHTML = drawWaves(ev, rows, start, plotEnd) +
+    '<div class="note">Raw signal, mean removed, each row scaled separately. ' +
+    'Red lines are station alarms; the time axis is UTC.</div>';
+}
+
+function drawWaves(ev, rows, start, end) {
+  const W = 400, ROW = 62, PAD_T = 6, AXIS = 22, X0 = 8, X1 = W - 8;
+  const H = PAD_T + rows.length * ROW + AXIS;
+  const x = (ms) => X0 + (ms - start) / (end - start) * (X1 - X0);
+  const alarmsBy = {};
+  for (const a of ev.alarms) (alarmsBy[a.station] = alarmsBy[a.station] || []).push(toMs(a.time));
+  const first = toMs(ev.t_first);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">`;
+  rows.forEach((r, i) => {
+    const top = PAD_T + i * ROW, mid = top + ROW / 2;
+    svg += `<line x1="${X0}" x2="${X1}" y1="${top + ROW}" y2="${top + ROW}" stroke="#e5e8ec"/>`;
+    // сигнал: вычитаем среднее и нормируем по максимуму в этом окне
+    if (r.values.length > 1) {
+      const mean = r.values.reduce((s, v) => s + v, 0) / r.values.length;
+      const peak = Math.max(...r.values.map((v) => Math.abs(v - mean))) || 1;
+      const pts = r.values.map((v, k) =>
+        `${x(r.times[k]).toFixed(1)},${(mid - (v - mean) / peak * (ROW / 2 - 8)).toFixed(1)}`);
+      svg += `<polyline points="${pts.join(" ")}" fill="none" stroke="#1c7ed6" stroke-width="0.8"/>`;
+    }
+    const al = alarmsBy[r.st.code] || [];
+    for (const a of al) {
+      svg += `<line x1="${x(a)}" x2="${x(a)}" y1="${top}" y2="${top + ROW}" stroke="#c92a2a" stroke-width="1.5"/>`;
+    }
+    let tag, color;
+    if (al.length) { tag = `ALARM +${Math.round((Math.min(...al) - first) / 1000)} s`; color = "#c92a2a"; }
+    else if (!r.values.length) { tag = r.error ? "error" : "no data"; color = "#868e96"; }
+    else { tag = "no alarm"; color = "#868e96"; }
+    svg += `<text x="${X0 + 2}" y="${top + 11}" font-size="10" font-weight="600" fill="#1f2933">${esc(r.st.code)}</text>` +
+           `<text x="${X1 - 2}" y="${top + 11}" font-size="10" text-anchor="end" fill="${color}">${esc(tag)}</text>`;
+  });
+  const axisY = PAD_T + rows.length * ROW;
+  for (let k = 0; k <= 4; k++) {
+    const ms = start + (end - start) * k / 4;
+    svg += `<text x="${x(ms)}" y="${axisY + 14}" font-size="9" fill="#6b7785" ` +
+           `text-anchor="${k === 0 ? "start" : k === 4 ? "end" : "middle"}">${fmtClock(ms)}</text>`;
+  }
+  return svg + "</svg>";
+}
+
+// ---------- Обновление раз в 2 секунды ----------
+async function tick() {
+  try {
+    const events = await getJSON("/api/events?status=confirmed&limit=100");
+    const now = Date.now();
+    for (const ev of events) {
+      // события, которые уже были при открытии страницы, "новыми" не считаем
+      if (!state.firstSeen.has(ev.id)) state.firstSeen.set(ev.id, state.firstTick ? 0 : now);
+    }
+    state.firstTick = false;
+    state.events = events;
+    const sig = events.map((e) => `${e.id}:${e.n_stations}:${e.t_last}`).join("|");
+    if (sig !== state.signature) {
+      state.signature = sig;
+      renderList();
+      syncMapLayers();
+      // выбранное событие могло получить новые тревоги: обновим его графики
+      const sel = events.find((e) => e.id === state.selected);
+      if (sel) loadWaveforms(sel);
+    }
+    updateFreshness();
+    setStatus(true, "live, updated " + fmtClock(now) + " UTC");
+  } catch (e) {
+    console.error("tick failed:", e); // для отладки: причина видна в консоли браузера
+    setStatus(false, "server unreachable");
+  }
+}
+
+async function main() {
+  try {
+    const [stations, cfg] = await Promise.all([getJSON("/api/stations"), getJSON("/api/config")]);
+    state.stations = stations;
+    $("rule").textContent = `Rule: at least ${cfg.min_stations} stations within 60 s`;
+  } catch (e) {
+    setStatus(false, "server unreachable");
+  }
+  initMap();
+  await tick();
+  setInterval(tick, REFRESH_MS);
+}
+main();
+</script>
+</body>
+</html>

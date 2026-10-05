@@ -20,6 +20,32 @@ SQLite (`server/quake.db`, в git не попадает).
     .venv/bin/python -m server.replay quake:2021-10-07 --speed 60
     .venv/bin/python -m server.replay hour:2016-06-11T17 --speed 0
 
+## Веб-страница: смотреть события онлайн (Windows)
+
+Страницу `web/index.html` отдаёт сам сервер по адресу `/`: карта Японии
+(Leaflet), станции, подтверждённые события кругами вокруг станций, справа список
+событий и графики сигналов по клику. Страница сама обновляется раз в 2 секунды.
+Карте и библиотеке нужен интернет (cdnjs и плитки OpenStreetMap); без него
+список событий и графики всё равно работают.
+
+1. Окно 1: запустить сервер (из корня проекта):
+
+       .venv\Scripts\pip install -r requirements-server.txt
+       .venv\Scripts\uvicorn server.app:create_app --factory --port 8000
+
+2. Открыть в браузере http://127.0.0.1:8000 : пока событий нет, там пустой список.
+3. Окно 2: запустить воспроизведение записей (нужна папка `data/`, её создаёт
+   `step13.py`; `--speed 60` = в 60 раз быстрее реального времени):
+
+       .venv\Scripts\python -m server.replay quake:2021-10-07 --speed 60
+
+4. На странице появятся события: новые (первые 30 секунд) оранжевые, старые
+   синие. Клик по событию показывает сигнал всех станций вокруг него.
+
+Порог подтверждения меняется переменной окружения перед запуском сервера:
+`set QUAKE_MIN_STATIONS=2` (в cmd) или `$env:QUAKE_MIN_STATIONS=2` (в PowerShell).
+Чтобы начать с чистой страницы, остановите сервер и удалите `server\quake.db`.
+
 ## API
 
 | Запрос | Что отдаёт |
@@ -30,5 +56,6 @@ SQLite (`server/quake.db`, в git не попадает).
 | `GET /api/events` | события с тревогами (`?status=confirmed`) |
 | `GET /api/waveform` | запись станции за интервал (`station`, `start`, `end`) |
 | `GET /api/config` | текущие настройки правила |
+| `GET /` | веб-страница (`web/index.html`) |
 
 Тесты: `.venv/bin/python -m pytest server -q`.
