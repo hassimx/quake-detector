@@ -1,0 +1,10 @@
+Разведка SeedLink, 2026-10-05T17:11:51.691707Z UTC
+Сервер: rtserve.earthscope.org:18000
+Откуда адрес: объявление EarthScope 'SeedLink service is moving as part of our cloud transition' (https://ngf.earthscope.org/news/seedlink-service-moving-part-our-cloud-transition) и документация https://docs.earthscope.org/service/seedlink. Там сказано: порт 18000 (SeedLink), 18500 (TLS), 443 (WebSocket); не более 5 одновременных соединений; keepalive не чаще раза в 4 минуты; старый адрес rtserve.iris.washington.edu теперь указывает на новый сервис.
+Оговорка: страницы документации не удалось открыть напрямую (доступ закрыт), цитаты взяты из результатов веб-поиска; проверьте их по ссылкам выше.
+
+=== 1. Список потоков ===
+НЕ УДАЛОСЬ подключиться к rtserve.earthscope.org:18000 и получить список потоков.
+Причина: SeedLinkException: 'cannot connect to SeedLink server: timed out'
+Это значит только то, что из ЭТОЙ сети сервер недоступен (часто закрыт порт 18000 или нет интернета). Запустите скрипт на своём компьютере: .venv\Scripts\python step16_livecheck.py
+Дальше (наличие станций, приём 60 с, задержки) без соединения проверить нельзя, ничего не придумываю.
