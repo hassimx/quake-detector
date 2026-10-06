@@ -1,0 +1,1067 @@
+{
+ "stations": [
+  {
+   "code": "IU.MAJO",
+   "name": "Matsushiro",
+   "lat": 36.54567,
+   "lon": 138.20406
+  },
+  {
+   "code": "JP.JGF",
+   "name": "Gifu Kurokawa",
+   "lat": 35.604,
+   "lon": 137.354172
+  },
+  {
+   "code": "JP.JSD",
+   "name": "Sado",
+   "lat": 38.040001,
+   "lon": 138.257172
+  },
+  {
+   "code": "G.INU",
+   "name": "Inuyama",
+   "lat": 35.35,
+   "lon": 137.029
+  },
+  {
+   "code": "PS.TSK",
+   "name": "Tsukuba",
+   "lat": 36.2108,
+   "lon": 140.1097
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "chiba-2021",
+   "kind": "quake",
+   "group": "tuning",
+   "title": "M5.9 5 km SW of Chiba, Japan",
+   "note": "Used while choosing the rule (step 14).",
+   "outcome": {
+    "detected": true,
+    "confirmed": true,
+    "delay": 29,
+    "confirm_delay": 29,
+    "any_event_delay": 29
+   },
+   "usgs": {
+    "time": "2021-10-07T13:41:24.528000Z",
+    "mag": 5.9,
+    "mag_type": "mww",
+    "lat": 35.5736,
+    "lon": 140.0705,
+    "depth": 62,
+    "place": "5 km SW of Chiba, Japan",
+    "dist_km": 200
+   },
+   "start": 1633613184.0
+  },
+  {
+   "id": "tohoku-2011",
+   "kind": "quake",
+   "group": "tuning",
+   "title": "M9.1 2011 Great Tohoku Earthquake, Japan",
+   "note": "Used while choosing the rule. Only 3 of 5 stations have data, so the network rule is met with no margin.",
+   "outcome": {
+    "detected": true,
+    "confirmed": true,
+    "delay": 58,
+    "confirm_delay": 80,
+    "any_event_delay": 80
+   },
+   "usgs": {
+    "time": "2011-03-11T05:46:24.120000Z",
+    "mag": 9.1,
+    "mag_type": "mww",
+    "lat": 38.297,
+    "lon": 142.373,
+    "depth": 29,
+    "place": "2011 Great Tohoku Earthquake, Japan",
+    "dist_km": 417
+   },
+   "start": 1299821484.0
+  },
+  {
+   "id": "ind-2022-06-19",
+   "kind": "quake",
+   "group": "independent",
+   "title": "M5.1 58 km NNE of Nanao, Japan",
+   "note": "Independent test (step 15): close event, confirmed.",
+   "outcome": {
+    "detected": true,
+    "confirmed": true,
+    "delay": 23,
+    "confirm_delay": 40,
+    "any_event_delay": 40
+   },
+   "usgs": {
+    "time": "2022-06-19T06:08:06.557000Z",
+    "mag": 5.1,
+    "mag_type": "mww",
+    "lat": 37.5046,
+    "lon": 137.3115,
+    "depth": 10,
+    "place": "58 km NNE of Nanao, Japan",
+    "dist_km": 133
+   },
+   "start": 1655617986.0
+  },
+  {
+   "id": "ind-2020-07-17",
+   "kind": "quake",
+   "group": "independent",
+   "title": "M4.5 69 km E of Namie, Japan",
+   "note": "Independent test: one of the smallest events (M4.5), confirmed.",
+   "outcome": {
+    "detected": true,
+    "confirmed": true,
+    "delay": 46,
+    "confirm_delay": 70,
+    "any_event_delay": 70
+   },
+   "usgs": {
+    "time": "2020-07-17T04:49:34.992000Z",
+    "mag": 4.5,
+    "mag_type": "mb",
+    "lat": 37.5173,
+    "lon": 141.7869,
+    "depth": 48,
+    "place": "69 km E of Namie, Japan",
+    "dist_km": 336
+   },
+   "start": 1594960474.0
+  },
+  {
+   "id": "ind-2016-03-07",
+   "kind": "quake",
+   "group": "independent",
+   "title": "M4.5 Izu Islands, Japan region",
+   "note": "Independent test, a FAILURE: MAJO alarmed, but only 2 stations did, so the network did not confirm it.",
+   "outcome": {
+    "detected": true,
+    "confirmed": false,
+    "delay": 91,
+    "confirm_delay": null,
+    "any_event_delay": null
+   },
+   "usgs": {
+    "time": "2016-03-07T02:40:25.600000Z",
+    "mag": 4.5,
+    "mag_type": "mb",
+    "lat": 31.0281,
+    "lon": 141.0074,
+    "depth": 55,
+    "place": "Izu Islands, Japan region",
+    "dist_km": 665
+   },
+   "start": 1457317525.0
+  },
+  {
+   "id": "ind-2018-08-03",
+   "kind": "quake",
+   "group": "independent",
+   "title": "M4.6 Izu Islands, Japan region",
+   "note": "Independent test, a FAILURE: a deep event (about 490 km). MAJO gave no alarm, so by our definition it was missed.",
+   "outcome": {
+    "detected": false,
+    "confirmed": false,
+    "delay": null,
+    "confirm_delay": null,
+    "any_event_delay": 100
+   },
+   "usgs": {
+    "time": "2018-08-03T13:07:03.220000Z",
+    "mag": 4.6,
+    "mag_type": "mb",
+    "lat": 30.3775,
+    "lon": 137.1884,
+    "depth": 494,
+    "place": "Izu Islands, Japan region",
+    "dist_km": 691
+   },
+   "start": 1533300723.0
+  },
+  {
+   "id": "quiet-2019-06-14",
+   "kind": "hour",
+   "group": "quiet",
+   "title": "Quiet hour 2019-06-14 05:00 UTC",
+   "note": "Quiet hour (no M4+ in the USGS catalogue): MAJO alone raised several alarms, the network confirmed none.",
+   "outcome": {
+    "majo_alarms": 7,
+    "confirmed_events": 0,
+    "events_without_majo": 0
+   },
+   "usgs": null,
+   "start": 1560488400.0
+  },
+  {
+   "id": "quiet-2024-01-05",
+   "kind": "hour",
+   "group": "quiet",
+   "title": "Quiet hour 2024-01-05 15:00 UTC",
+   "note": "Quiet hour: many MAJO alarms, one of them still confirmed by the network (a false event, or a small quake missing from the catalogue).",
+   "outcome": {
+    "majo_alarms": 9,
+    "confirmed_events": 1,
+    "events_without_majo": 0
+   },
+   "usgs": null,
+   "start": 1704466800.0
+  },
+  {
+   "id": "quiet-2021-11-05",
+   "kind": "hour",
+   "group": "quiet",
+   "title": "Quiet hour 2021-11-05 02:00 UTC",
+   "note": "Quiet hour: the network confirmed 2 events without any MAJO alarm (neighbors only).",
+   "outcome": {
+    "majo_alarms": 0,
+    "confirmed_events": 2,
+    "events_without_majo": 2
+   },
+   "usgs": null,
+   "start": 1636077600.0
+  }
+ ],
+ "results": {
+  "tuning": {
+   "quakes": {
+    "k": 10,
+    "n": 10,
+    "lo": 0.722,
+    "hi": 1.0
+   },
+   "hours": 24,
+   "majo_alarms": 18,
+   "net_events": 5,
+   "events": [
+    {
+     "origin": "2011-03-11T05:46:24",
+     "mag": 9.1,
+     "mag_type": "mww",
+     "depth": 29,
+     "place": "2011 Great Tohoku Earthquake, Japan"
+    },
+    {
+     "origin": "2021-10-07T13:41:24",
+     "mag": 5.9,
+     "mag_type": "mww",
+     "depth": 62,
+     "place": "5 km SW of Chiba, Japan"
+    },
+    {
+     "origin": "2016-12-28T12:38:49",
+     "mag": 5.9,
+     "mag_type": "mww",
+     "depth": 7,
+     "place": "13 km NE of Daigo, Japan"
+    },
+    {
+     "origin": "2022-05-22T15:17:31",
+     "mag": 6.0,
+     "mag_type": "mww",
+     "depth": 12,
+     "place": "235 km SSE of Katsuura, Japan"
+    },
+    {
+     "origin": "2021-05-13T23:58:14",
+     "mag": 6.0,
+     "mag_type": "mww",
+     "depth": 32,
+     "place": "76 km ENE of Namie, Japan"
+    },
+    {
+     "origin": "2020-06-24T19:47:45",
+     "mag": 5.9,
+     "mag_type": "mww",
+     "depth": 29,
+     "place": "36 km SE of Hasaki, Japan"
+    },
+    {
+     "origin": "2018-07-07T11:23:50",
+     "mag": 5.9,
+     "mag_type": "mww",
+     "depth": 40,
+     "place": "27 km SE of ?hara, Japan"
+    },
+    {
+     "origin": "2016-04-01T02:39:08",
+     "mag": 5.9,
+     "mag_type": "mww",
+     "depth": 14,
+     "place": "54 km SE of Shing?, Japan"
+    },
+    {
+     "origin": "2023-05-14T08:21:41",
+     "mag": 5.8,
+     "mag_type": "mww",
+     "depth": 13,
+     "place": "156 km SSE of Shimoda, Japan"
+    },
+    {
+     "origin": "2021-08-03T20:33:34",
+     "mag": 5.8,
+     "mag_type": "mww",
+     "depth": 27,
+     "place": "121 km ENE of Hasaki, Japan"
+    }
+   ]
+  },
+  "independent": {
+   "quakes": {
+    "majo": {
+     "k": 58,
+     "n": 60,
+     "lo": 0.886,
+     "hi": 0.991
+    },
+    "net": {
+     "k": 56,
+     "n": 60,
+     "lo": 0.841,
+     "hi": 0.974
+    }
+   },
+   "bins": [
+    {
+     "name": "4.5-4.9",
+     "kind": "mag",
+     "majo": {
+      "k": 18,
+      "n": 20,
+      "lo": 0.699,
+      "hi": 0.972
+     },
+     "net": {
+      "k": 16,
+      "n": 20,
+      "lo": 0.584,
+      "hi": 0.919
+     }
+    },
+    {
+     "name": "5.0-5.3",
+     "kind": "mag",
+     "majo": {
+      "k": 20,
+      "n": 20,
+      "lo": 0.839,
+      "hi": 1.0
+     },
+     "net": {
+      "k": 20,
+      "n": 20,
+      "lo": 0.839,
+      "hi": 1.0
+     }
+    },
+    {
+     "name": "5.4-5.7",
+     "kind": "mag",
+     "majo": {
+      "k": 20,
+      "n": 20,
+      "lo": 0.839,
+      "hi": 1.0
+     },
+     "net": {
+      "k": 20,
+      "n": 20,
+      "lo": 0.839,
+      "hi": 1.0
+     }
+    },
+    {
+     "name": "<150 km",
+     "kind": "dist",
+     "majo": {
+      "k": 2,
+      "n": 2,
+      "lo": 0.342,
+      "hi": 1.0
+     },
+     "net": {
+      "k": 2,
+      "n": 2,
+      "lo": 0.342,
+      "hi": 1.0
+     }
+    },
+    {
+     "name": "150-300 km",
+     "kind": "dist",
+     "majo": {
+      "k": 9,
+      "n": 9,
+      "lo": 0.701,
+      "hi": 1.0
+     },
+     "net": {
+      "k": 9,
+      "n": 9,
+      "lo": 0.701,
+      "hi": 1.0
+     }
+    },
+    {
+     "name": ">300 km",
+     "kind": "dist",
+     "majo": {
+      "k": 47,
+      "n": 49,
+      "lo": 0.863,
+      "hi": 0.989
+     },
+     "net": {
+      "k": 45,
+      "n": 49,
+      "lo": 0.808,
+      "hi": 0.968
+     }
+    }
+   ],
+   "hours": 150,
+   "majo_false": {
+    "count": 135,
+    "rate": 0.9,
+    "boot": [
+     0.707,
+     1.12
+    ],
+    "poisson": [
+     0.755,
+     1.065
+    ]
+   },
+   "net_false": {
+    "count": 49,
+    "rate": 0.327,
+    "boot": [
+     0.24,
+     0.413
+    ],
+    "poisson": [
+     0.242,
+     0.432
+    ]
+   },
+   "net_false_without_majo": 6,
+   "events": [
+    {
+     "time": "2020-07-17T04:49:34",
+     "mag": 4.5,
+     "depth": 48,
+     "dist": 336,
+     "delay": 46,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2022-08-07T17:10:40",
+     "mag": 4.7,
+     "depth": 10,
+     "dist": 576,
+     "delay": 80,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2017-07-14T10:13:51",
+     "mag": 4.7,
+     "depth": 10,
+     "dist": 380,
+     "delay": 54,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2021-06-15T06:18:34",
+     "mag": 4.5,
+     "depth": 10,
+     "dist": 324,
+     "delay": 48,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-10-26T08:45:35",
+     "mag": 4.5,
+     "depth": 117,
+     "dist": 917,
+     "delay": 119,
+     "stations_alarmed": 3,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2016-03-25T14:55:19",
+     "mag": 4.5,
+     "depth": 38,
+     "dist": 267,
+     "delay": 37,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-12-19T20:28:41",
+     "mag": 4.9,
+     "depth": 42,
+     "dist": 933,
+     "delay": 123,
+     "stations_alarmed": 3,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-12-18T11:54:16",
+     "mag": 4.6,
+     "depth": 102,
+     "dist": 1010,
+     "delay": 134,
+     "stations_alarmed": 1,
+     "stations_with_data": 5,
+     "confirmed": false
+    },
+    {
+     "time": "2022-03-28T16:36:29",
+     "mag": 4.6,
+     "depth": 58,
+     "dist": 355,
+     "delay": 48,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2016-01-17T14:23:51",
+     "mag": 4.6,
+     "depth": 9,
+     "dist": 827,
+     "delay": null,
+     "stations_alarmed": 0,
+     "stations_with_data": 5,
+     "confirmed": false
+    },
+    {
+     "time": "2020-01-03T01:19:09",
+     "mag": 4.7,
+     "depth": 186,
+     "dist": 418,
+     "delay": 60,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2021-11-08T16:15:01",
+     "mag": 4.7,
+     "depth": 36,
+     "dist": 214,
+     "delay": 31,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2022-05-19T00:14:53",
+     "mag": 4.5,
+     "depth": 10,
+     "dist": 479,
+     "delay": 68,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2020-11-29T15:40:20",
+     "mag": 4.5,
+     "depth": 59,
+     "dist": 285,
+     "delay": 39,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2020-08-27T00:48:42",
+     "mag": 4.5,
+     "depth": 44,
+     "dist": 438,
+     "delay": 61,
+     "stations_alarmed": 3,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-08-03T13:07:03",
+     "mag": 4.6,
+     "depth": 494,
+     "dist": 691,
+     "delay": null,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": false
+    },
+    {
+     "time": "2016-08-20T05:52:40",
+     "mag": 4.6,
+     "depth": 10,
+     "dist": 587,
+     "delay": 81,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2021-01-27T09:25:58",
+     "mag": 4.5,
+     "depth": 70,
+     "dist": 269,
+     "delay": 39,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2016-03-07T02:40:25",
+     "mag": 4.5,
+     "depth": 55,
+     "dist": 665,
+     "delay": 91,
+     "stations_alarmed": 2,
+     "stations_with_data": 5,
+     "confirmed": false
+    },
+    {
+     "time": "2016-04-16T15:14:52",
+     "mag": 4.7,
+     "depth": 10,
+     "dist": 775,
+     "delay": 103,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2024-04-08T01:25:29",
+     "mag": 5.1,
+     "depth": 51,
+     "dist": 830,
+     "delay": 108,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2016-08-13T20:15:07",
+     "mag": 5.2,
+     "depth": 38,
+     "dist": 298,
+     "delay": 43,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2016-07-19T23:50:21",
+     "mag": 5.0,
+     "depth": 42,
+     "dist": 471,
+     "delay": 65,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2021-11-30T18:27:38",
+     "mag": 5.0,
+     "depth": 10,
+     "dist": 712,
+     "delay": 95,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2022-06-19T06:08:06",
+     "mag": 5.1,
+     "depth": 10,
+     "dist": 133,
+     "delay": 23,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-09-07T09:35:50",
+     "mag": 5.2,
+     "depth": 57,
+     "dist": 652,
+     "delay": 87,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2022-03-18T14:25:18",
+     "mag": 5.1,
+     "depth": 30,
+     "dist": 515,
+     "delay": 69,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-07-01T00:37:36",
+     "mag": 5.2,
+     "depth": 44,
+     "dist": 620,
+     "delay": 83,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2024-07-04T03:12:30",
+     "mag": 5.1,
+     "depth": 48,
+     "dist": 250,
+     "delay": 35,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2023-06-17T11:42:40",
+     "mag": 5.0,
+     "depth": 53,
+     "dist": 660,
+     "delay": 87,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2024-12-27T19:10:05",
+     "mag": 5.3,
+     "depth": 45,
+     "dist": 315,
+     "delay": 44,
+     "stations_alarmed": 4,
+     "stations_with_data": 4,
+     "confirmed": true
+    },
+    {
+     "time": "2016-07-19T22:25:32",
+     "mag": 5.0,
+     "depth": 39,
+     "dist": 175,
+     "delay": 25,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2016-08-20T05:14:57",
+     "mag": 5.3,
+     "depth": 23,
+     "dist": 575,
+     "delay": 77,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-12-19T06:21:33",
+     "mag": 5.1,
+     "depth": 49,
+     "dist": 558,
+     "delay": 76,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2020-03-12T17:18:46",
+     "mag": 5.3,
+     "depth": 10,
+     "dist": 143,
+     "delay": 24,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2021-06-20T11:08:24",
+     "mag": 5.3,
+     "depth": 152,
+     "dist": 865,
+     "delay": 109,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-08-17T22:28:37",
+     "mag": 5.0,
+     "depth": 10,
+     "dist": 742,
+     "delay": 98,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-09-30T17:56:08",
+     "mag": 5.0,
+     "depth": 314,
+     "dist": 782,
+     "delay": 102,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-12-04T01:38:55",
+     "mag": 5.0,
+     "depth": 27,
+     "dist": 201,
+     "delay": 31,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2020-09-06T21:33:49",
+     "mag": 5.1,
+     "depth": 31,
+     "dist": 301,
+     "delay": 42,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-06-17T22:58:34",
+     "mag": 5.5,
+     "depth": 10,
+     "dist": 301,
+     "delay": 44,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-11-28T02:23:24",
+     "mag": 5.4,
+     "depth": 9,
+     "dist": 687,
+     "delay": 94,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2022-05-17T13:17:52",
+     "mag": 5.5,
+     "depth": 13,
+     "dist": 463,
+     "delay": 65,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2023-09-18T19:33:03",
+     "mag": 5.5,
+     "depth": 51,
+     "dist": 376,
+     "delay": 52,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2022-08-17T04:24:44",
+     "mag": 5.6,
+     "depth": 10,
+     "dist": 501,
+     "delay": 70,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-05-17T18:42:13",
+     "mag": 5.7,
+     "depth": 30,
+     "dist": 930,
+     "delay": 119,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2016-05-21T06:06:42",
+     "mag": 5.5,
+     "depth": 125,
+     "dist": 644,
+     "delay": 85,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-10-25T18:36:09",
+     "mag": 5.7,
+     "depth": 40,
+     "dist": 373,
+     "delay": 52,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-05-06T06:03:59",
+     "mag": 5.4,
+     "depth": 10,
+     "dist": 595,
+     "delay": 83,
+     "stations_alarmed": 3,
+     "stations_with_data": 4,
+     "confirmed": true
+    },
+    {
+     "time": "2017-04-29T12:32:34",
+     "mag": 5.7,
+     "depth": 31,
+     "dist": 894,
+     "delay": 114,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2017-09-10T08:44:24",
+     "mag": 5.5,
+     "depth": 45,
+     "dist": 708,
+     "delay": 93,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-08-15T05:32:53",
+     "mag": 5.4,
+     "depth": 86,
+     "dist": 544,
+     "delay": 73,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-07-31T08:42:20",
+     "mag": 5.5,
+     "depth": 11,
+     "dist": 267,
+     "delay": 41,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2020-01-28T01:36:03",
+     "mag": 5.4,
+     "depth": 91,
+     "dist": 1016,
+     "delay": 129,
+     "stations_alarmed": 3,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2018-02-25T16:28:39",
+     "mag": 5.6,
+     "depth": 31,
+     "dist": 335,
+     "delay": 48,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-04-27T17:24:45",
+     "mag": 5.4,
+     "depth": 111,
+     "dist": 766,
+     "delay": 100,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2021-08-04T04:40:25",
+     "mag": 5.4,
+     "depth": 14,
+     "dist": 331,
+     "delay": 47,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2023-10-06T05:49:22",
+     "mag": 5.5,
+     "depth": 10,
+     "dist": 733,
+     "delay": 102,
+     "stations_alarmed": 4,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2019-02-21T12:22:40",
+     "mag": 5.4,
+     "depth": 28,
+     "dist": 761,
+     "delay": 102,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    },
+    {
+     "time": "2020-12-12T07:18:54",
+     "mag": 5.5,
+     "depth": 44,
+     "dist": 520,
+     "delay": 71,
+     "stations_alarmed": 5,
+     "stations_with_data": 5,
+     "confirmed": true
+    }
+   ]
+  }
+ },
+ "rule": {
+  "min_stations": 3,
+  "window_s": 60,
+  "threshold": 10,
+  "sta_s": 1,
+  "lta_s": 30,
+  "band_hz": [
+   1,
+   8
+  ]
+ },
+ "built": "2026-10-06T17:32:01Z"
+}
