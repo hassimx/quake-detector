@@ -162,7 +162,7 @@
    "kind": "quake",
    "group": "independent",
    "title": "M4.6 Izu Islands, Japan region",
-   "note": "Independent test, a FAILURE: a deep event (about 490 km). MAJO gave no alarm, so by our definition it was missed.",
+   "note": "Independent test, a FAILURE: a deep event (about 490 km). MAJO gave no alarm within 150 s after the origin (its only alarm came 63 s before it), so by our definition it was missed.",
    "outcome": {
     "detected": false,
     "confirmed": false,
@@ -187,7 +187,7 @@
    "kind": "hour",
    "group": "quiet",
    "title": "Quiet hour 2019-06-14 05:00 UTC",
-   "note": "Quiet hour (no M4+ in the USGS catalogue): MAJO alone raised several alarms, the network confirmed none.",
+   "note": "Quiet hour (no M4+ in the study region in the USGS catalogue): MAJO alone raised several alarms, the network confirmed none.",
    "outcome": {
     "majo_alarms": 7,
     "confirmed_events": 0,
@@ -310,6 +310,13 @@
    ]
   },
   "independent": {
+   "funnel": {
+    "m45_57": 2908,
+    "near_step13": 14,
+    "other_m4": 553,
+    "aftershock": 2,
+    "left": 2339
+   },
    "quakes": {
     "majo": {
      "k": 58,
@@ -1063,5 +1070,5 @@
    8
   ]
  },
- "built": "2026-10-06T17:32:01Z"
+ "built": "2026-10-08T18:49:04Z"
 }

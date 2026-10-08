@@ -68,11 +68,12 @@ SCENARIOS = [
     dict(id="ind-2018-08-03", kind="quake", group="independent",
          origin="2018-08-03T13:07:03", tag="s15q_20180803T130703",
          note="Independent test, a FAILURE: a deep event (about 490 km). "
-              "MAJO gave no alarm, so by our definition it was missed."),
+              "MAJO gave no alarm within 150 s after the origin (its only alarm "
+              "came 63 s before it), so by our definition it was missed."),
     dict(id="quiet-2019-06-14", kind="hour", group="quiet",
          start="2019-06-14T05", tag="s15h_20190614T05",
-         note="Quiet hour (no M4+ in the USGS catalogue): MAJO alone raised "
-              "several alarms, the network confirmed none."),
+         note="Quiet hour (no M4+ in the study region in the USGS catalogue): "
+              "MAJO alone raised several alarms, the network confirmed none."),
     dict(id="quiet-2024-01-05", kind="hour", group="quiet",
          start="2024-01-05T15", tag="s15h_20240105T15",
          note="Quiet hour: many MAJO alarms, one of them still confirmed by "
@@ -166,7 +167,7 @@ def envelope(tr):
 def run_through_server(traces):
     """Гоним записи через сервер; запоминаем, КОГДА сервер узнал о тревогах и
     когда событие стало подтверждённым (время данных конца куска)."""
-    alarms, confirmed_at = [], {}
+    alarms, first_conf = [], {}   # id тревоги -> когда она впервые оказалась в подтверждённом событии
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         app = create_app(os.path.join(tmp, "s.db"), MIN_NET)
         client = TestClient(app)
@@ -182,8 +183,9 @@ def run_through_server(traces):
                                    peak=a["peak"],
                                    detected_at=chunk_end.timestamp))
             for ev in client.get("/api/events", params=dict(limit=100000)).json():
-                if ev["status"] == "confirmed" and ev["id"] not in confirmed_at:
-                    confirmed_at[ev["id"]] = chunk_end.timestamp
+                if ev["status"] == "confirmed":
+                    for a in ev["alarms"]:
+                        first_conf.setdefault(a["id"], chunk_end.timestamp)
         final = client.get("/api/events", params=dict(limit=100000)).json()
         final_alarms = {a["id"]: a for a in client.get(
             "/api/alarms", params=dict(limit=100000)).json()}
@@ -195,8 +197,10 @@ def run_through_server(traces):
         if ev["status"] != "confirmed":
             continue
         # если событие получилось склейкой, берём самое раннее подтверждение
+        # любой его части
+        times = [first_conf[a["id"]] for a in ev["alarms"] if a["id"] in first_conf]
         events.append(dict(
-            id=ev["id"], confirmed_at=confirmed_at.get(ev["id"]),
+            id=ev["id"], confirmed_at=min(times) if times else None,
             stations=sorted({a["station"] for a in ev["alarms"]}),
             first_ts=UTCDateTime(ev["t_first"]).timestamp))
     for e in events:
@@ -299,7 +303,12 @@ def results_summary(meta_tuning):
             confirmed=netv == "ДА"))
     if len(events) != n:
         raise SystemExit(f"В выводе шага 15 нашлось {len(events)} событий, а не {n}")
-    independent = dict(
+    m = must(r"M4\.5-5\.7 \(тип earthquake\): (\d+); рядом с событиями step13: (\d+); "
+             r"другое M4\+ в \+-10 мин от окна: (\d+); в 30 мин после M5\.5\+: (\d+); "
+             r"остаётся кандидатов: (\d+)", s15, "воронка отбора шага 15")
+    funnel = dict(zip(("m45_57", "near_step13", "other_m4", "aftershock", "left"),
+                      map(int, m.groups())))
+    independent = dict(funnel=funnel,
         quakes=dict(majo=share(seen, n), net=share(net, n)), bins=bins,
         hours=int(majo_q[1]),
         majo_false=dict(count=int(majo_q[0]), rate=majo_q[2],
@@ -334,9 +343,11 @@ def main():
         res = outcome(sc, alarms, events, origin_ts)
         title = (f"M{info['mag']} {info['place']}" if info
                  else f"Quiet hour {sc['start'].replace('T', ' ')}:00 UTC")
+        end_ts = max([end.timestamp] + [a["detected_at"] for a in alarms]
+                     + [e["confirmed_at"] for e in events])
         doc = dict(
             id=sc["id"], kind=sc["kind"], group=sc["group"], title=title,
-            note=sc["note"], start=start.timestamp, end=end.timestamp,
+            note=sc["note"], start=start.timestamp, end=end_ts,
             origin=origin_ts,
             usgs=info, missing=missing, outcome=res, alarms=alarms, events=events,
             traces={code: envelope(tr) for code, tr in traces.items()})
