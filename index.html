@@ -3,62 +3,76 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Quake Detector</title>
 <meta name="description" content="An STA/LTA earthquake detector for Japan that confirms events with a 5-station network. Recorded data replayed in the browser, with honest test results.">
-<!-- Leaflet с cdnjs: единственная внешняя библиотека. Графики рисуем сами (SVG). -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<!-- Leaflet с cdnjs: единственная внешняя библиотека. Стиль грузим без блокировки
+     отрисовки, скрипт подключаем из кода: если cdnjs недоступен, страница всё равно работает. -->
+<link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+      onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"></noscript>
 <style>
   /* ---------- Цвета: светлая и тёмная тема ---------- */
   :root {
-    --bg: #f5f6f8; --panel: #ffffff; --text: #1d2530; --muted: #5f6b7a;
+    color-scheme: light;
+    --bg: #f5f6f8; --panel: #ffffff; --text: #1d2530; --muted: #5a6575;
     --line: #dde2e8; --soft: #eef1f5; --accent: #1c6fd1; --accent-soft: #e5f0fc;
+    --on-accent: #ffffff;
     --ok: #237a3b; --ok-soft: #e3f4e7; --bad: #b42318; --bad-soft: #fdecea;
-    --warn: #b45309; --warn-soft: #fdf1e3; --fresh: #e8590c; --old: #1c6fd1;
+    --warn: #a14a07; --warn-soft: #fdf1e3; --old: #1c6fd1;
+    --new-bg: #c2410c; --new-fg: #ffffff;
     --signal: #2f6db5; --ratio: #8a5cc2; --alarm: #c92a2a; --single: #d9822b;
     --shadow: 0 1px 2px rgba(16, 24, 40, .06);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #11161d; --panel: #18202a; --text: #e6ebf1; --muted: #9aa7b6;
+      color-scheme: dark;
+      --bg: #11161d; --panel: #18202a; --text: #e6ebf1; --muted: #a3afbd;
       --line: #2a3542; --soft: #202a36; --accent: #6aa8f0; --accent-soft: #1d2f45;
+      --on-accent: #11161d;
       --ok: #5fc27a; --ok-soft: #173323; --bad: #f2837a; --bad-soft: #3a1d1b;
-      --warn: #f0b062; --warn-soft: #3a2a16; --fresh: #ff8a4c; --old: #6aa8f0;
+      --warn: #f0b062; --warn-soft: #3a2a16; --old: #6aa8f0;
+      --new-bg: #ff8a4c; --new-fg: #11161d;
       --signal: #7fb0ea; --ratio: #b99be6; --alarm: #ff6b6b; --single: #f0a35b;
       --shadow: none;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #11161d; --panel: #18202a; --text: #e6ebf1; --muted: #9aa7b6;
+    color-scheme: dark;
+    --bg: #11161d; --panel: #18202a; --text: #e6ebf1; --muted: #a3afbd;
     --line: #2a3542; --soft: #202a36; --accent: #6aa8f0; --accent-soft: #1d2f45;
+    --on-accent: #11161d;
     --ok: #5fc27a; --ok-soft: #173323; --bad: #f2837a; --bad-soft: #3a1d1b;
-    --warn: #f0b062; --warn-soft: #3a2a16; --fresh: #ff8a4c; --old: #6aa8f0;
+    --warn: #f0b062; --warn-soft: #3a2a16; --old: #6aa8f0;
+    --new-bg: #ff8a4c; --new-fg: #11161d;
     --signal: #7fb0ea; --ratio: #b99be6; --alarm: #ff6b6b; --single: #f0a35b;
     --shadow: none;
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  /* шапка липкая: якоря и фокус не должны прятаться под ней */
+  html { scroll-behavior: smooth; scroll-padding-top: 90px; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   a { color: var(--accent); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden;
              clip: rect(0 0 0 0); white-space: nowrap; }
 
   /* ---------- Шапка ---------- */
   header.top { background: var(--panel); border-bottom: 1px solid var(--line);
-               position: sticky; top: 0; z-index: 1000; }
+               position: sticky; top: 0; z-index: 2000; }
   header.top .wrap { display: flex; align-items: center; gap: 8px 20px;
                      flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
   .brand { font-weight: 700; font-size: 17px; margin-right: auto; }
   .brand span { color: var(--muted); font-weight: 400; }
+  nav { display: flex; gap: 16px; flex-wrap: wrap; }
   nav a { text-decoration: none; color: var(--muted); font-size: 14px; }
   nav a:hover { color: var(--text); }
-  nav { display: flex; gap: 16px; flex-wrap: wrap; }
 
   /* ---------- Вступление ---------- */
-  .hero { padding: 28px 0 8px; }
+  .hero { padding-top: 28px; padding-bottom: 8px; }
   .hero h1 { font-size: 26px; line-height: 1.25; margin: 0 0 8px; }
   .hero p { margin: 0 0 6px; color: var(--muted); max-width: 820px; }
   .tiles { display: grid; gap: 12px; margin: 18px 0 6px;
@@ -81,7 +95,7 @@
   /* ---------- Проигрывание ---------- */
   .player { display: grid; gap: 12px;
             grid-template-columns: 250px minmax(0, 1fr) 300px; }
-  .picker { padding: 10px; max-height: 640px; overflow: auto; }
+  .picker { padding: 10px; max-height: 700px; overflow: auto; }
   .picker h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
                color: var(--muted); margin: 10px 6px 6px; }
   .picker h3:first-child { margin-top: 2px; }
@@ -98,23 +112,26 @@
   .badge.bad { background: var(--bad-soft); color: var(--bad); }
   .badge.warn { background: var(--warn-soft); color: var(--warn); }
 
-  .stage { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-  #map { height: 400px; background: var(--soft); position: relative; }
+  .stage { display: flex; flex-direction: column; min-width: 0; }
+  .mapcard { overflow: hidden; }
+  /* карта - отдельный контекст наложения: её слои не вылезают поверх шапки */
+  #map { height: 400px; background: var(--soft); position: relative; isolation: isolate; z-index: 0; }
+  #map:focus-visible { outline-offset: -3px; }
   #map-msg { display: none; position: absolute; inset: 0; align-items: center;
              justify-content: center; text-align: center; padding: 20px; color: var(--muted); }
-  .legend { position: absolute; right: 8px; bottom: 22px; z-index: 600;
-            background: rgba(255,255,255,.93); color: #1d2530; border: 1px solid #dde2e8;
-            border-radius: 6px; padding: 5px 9px; font-size: 12px; }
-  .legend div { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 12px 0;
+            font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid; flex: none; }
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
-              padding: 10px 12px; border-top: 1px solid var(--line); }
+              padding: 10px 12px; }
   .btn { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel);
          color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer;
          min-height: 36px; }
   .btn:hover { background: var(--soft); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff;
-                 min-width: 84px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+                 min-width: 88px; font-weight: 600; }
   .btn.primary:hover { filter: brightness(1.06); }
   select.btn { padding-right: 6px; }
   #seek { flex: 1 1 200px; min-width: 140px; accent-color: var(--accent); }
@@ -127,7 +144,9 @@
   .side h3 { font-size: 14px; margin: 0 0 6px; }
   .info .title { font-weight: 700; line-height: 1.3; }
   .info .note { color: var(--muted); font-size: 13px; margin: 4px 0 8px; }
-  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
+  #loadmsg { color: var(--muted); font-size: 13px; }
+  #loadmsg:empty { display: none; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; margin: 0; }
   .kv dt { color: var(--muted); }
   .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
   .outcome { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px;
@@ -136,19 +155,20 @@
   .outcome.bad { background: var(--bad-soft); }
   .outcome.warn { background: var(--warn-soft); }
   .outcome b { display: block; }
-  .list { list-style: none; margin: 0; padding: 0; max-height: 210px; overflow: auto;
+  .list { list-style: none; margin: 0; padding: 0; max-height: 230px; overflow: auto;
           font-size: 13px; }
   .list li { padding: 5px 0; border-bottom: 1px solid var(--line);
              font-variant-numeric: tabular-nums; }
   .list li:last-child { border-bottom: 0; }
-  .list .muted, .muted { color: var(--muted); }
-  .list .evt { cursor: pointer; }
-  .list .evt:hover { background: var(--soft); }
-  .list .evt.sel { background: var(--accent-soft); }
+  .muted { color: var(--muted); }
+  .evt { display: block; width: 100%; text-align: left; background: none; border: 0;
+         color: inherit; font: inherit; padding: 2px 4px; border-radius: 6px; cursor: pointer; }
+  .evt:hover { background: var(--soft); }
+  .evt[aria-current="true"] { background: var(--accent-soft); }
   .chip { font-size: 11px; padding: 0 6px; border-radius: 999px; white-space: nowrap; }
   .chip.ev { background: var(--bad-soft); color: var(--bad); }
   .chip.single { background: var(--soft); color: var(--muted); }
-  .chip.new { background: var(--fresh); color: #fff; }
+  .chip.new { background: var(--new-bg); color: var(--new-fg); font-weight: 600; }
   .empty { color: var(--muted); font-size: 13px; }
 
   /* ---------- Дорожки сигналов ---------- */
@@ -156,12 +176,12 @@
   .tracks-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px;
                  align-items: baseline; margin-bottom: 4px; }
   .tracks-head h3 { margin: 0; font-size: 14px; }
-  .tracks-head .key { font-size: 12px; color: var(--muted); display: flex; gap: 12px;
+  .tracks-head .key { font-size: 12px; color: var(--muted); display: flex; gap: 4px 12px;
                       flex-wrap: wrap; }
   .key i { display: inline-block; width: 14px; height: 3px; vertical-align: middle;
            margin-right: 4px; border-radius: 2px; }
   .tracks { --lw: 104px; --f: 0; position: relative; cursor: crosshair;
-            touch-action: pan-y; }
+            touch-action: pan-y; user-select: none; -webkit-user-select: none; }
   .track { display: grid; grid-template-columns: var(--lw) 1fr; align-items: stretch;
            border-bottom: 1px solid var(--line); }
   .tlabel { font-size: 12px; line-height: 1.25; padding: 6px 6px 6px 0; }
@@ -181,17 +201,19 @@
   .al.ev { stroke: var(--alarm); }
   .al.single { stroke: var(--single); stroke-dasharray: 4 3; }
   .orig { stroke: var(--text); stroke-width: 1; stroke-dasharray: 2 3; opacity: .55; }
-  .playhead { position: absolute; top: 0; bottom: 22px; width: 2px; background: var(--text);
+  .playhead { position: absolute; top: 0; bottom: 36px; width: 2px; background: var(--text);
               left: calc(var(--lw) + (100% - var(--lw)) * var(--f)); pointer-events: none;
               opacity: .8; }
-  .future { position: absolute; top: 0; bottom: 22px; right: 0; pointer-events: none;
+  .future { position: absolute; top: 0; bottom: 36px; right: 0; pointer-events: none;
             left: calc(var(--lw) + (100% - var(--lw)) * var(--f));
             background: var(--panel); opacity: .55; }
-  .taxis { position: relative; height: 22px; margin-left: var(--lw); font-size: 11px;
+  /* ось времени: метки в верхнем ряду, "origin" - в нижнем, чтобы не налезали */
+  .taxis { position: relative; height: 36px; margin-left: var(--lw); font-size: 11px;
            color: var(--muted); }
   .taxis span { position: absolute; top: 4px; transform: translateX(-50%); white-space: nowrap; }
   .taxis span.first { transform: none; }
   .taxis span.last { transform: translateX(-100%); }
+  .taxis span.orig-l { top: 19px; font-weight: 600; color: var(--text); }
 
   /* ---------- Маркеры на карте ---------- */
   .st-ico { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff;
@@ -209,12 +231,12 @@
 
   /* ---------- Как работает ---------- */
   .flow { display: grid; gap: 10px; grid-template-columns: repeat(4, 1fr); margin: 6px 0 16px; }
-  .flow .step { padding: 12px 14px; position: relative; }
+  .flow .step { padding: 12px 14px; }
   .flow .step b { display: block; margin-bottom: 4px; }
   .flow .step p { margin: 0; font-size: 14px; color: var(--muted); }
   .flow .n { display: inline-flex; width: 22px; height: 22px; border-radius: 50%;
-             background: var(--accent); color: #fff; font-size: 13px; align-items: center;
-             justify-content: center; margin-right: 6px; }
+             background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 700;
+             align-items: center; justify-content: center; margin-right: 6px; }
   .prose { max-width: 900px; }
   .prose p { margin: 0 0 10px; }
 
@@ -234,19 +256,21 @@
   th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase;
        letter-spacing: .03em; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .table-wrap { overflow-x: auto; }
+  /* position: relative - чтобы невидимые подписи (.sr-only) в таблице не раздвигали страницу */
+  .table-wrap { overflow-x: auto; position: relative; }
   .cibar { position: relative; height: 14px; min-width: 120px; background: var(--soft);
            border-radius: 3px; }
   .cibar .rng { position: absolute; top: 3px; height: 8px; border-radius: 3px; opacity: .35; }
   .cibar .pt { position: absolute; top: 0; width: 3px; height: 14px; border-radius: 1px; }
   .cibar.majo .rng, .cibar.majo .pt { background: var(--accent); }
-  .cibar.net .rng, .cibar.net .pt { background: var(--fresh); }
+  .cibar.net .rng, .cibar.net .pt { background: var(--new-bg); }
   figure { margin: 14px 0 0; }
   figure img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line);
                background: #fff; }
   figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
   details { margin-top: 12px; }
   summary { cursor: pointer; font-weight: 600; }
+  .tnote { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
   .yes { color: var(--ok); font-weight: 600; }
   .no { color: var(--bad); font-weight: 600; }
   ul.limits { margin: 0; padding-left: 20px; max-width: 900px; }
@@ -266,6 +290,7 @@
     .hero h1 { font-size: 22px; }
     .tracks { --lw: 78px; }
     .tlabel small { display: none; }
+    html { scroll-padding-top: 110px; }
   }
 </style>
 </head>
@@ -289,7 +314,7 @@
        An event is reported only when at least <b>3 of the 5 stations</b> raise an alarm
        within 60 seconds of each other. Below you can replay real recordings and see the
        results of an independent test on data that was not used to tune the system.</p>
-    <div class="tiles" id="tiles" aria-live="polite"></div>
+    <div class="tiles" id="tiles"></div>
     <div class="notlive">&#9888; Not a live feed: recorded data, replayed in your browser.</div>
   </div>
 
@@ -301,29 +326,29 @@
          computed beforehand by the project's own server code on the recorded data; the page
          only plays them back. The list includes failures on purpose.</p>
       <div class="player">
-        <div class="card picker" id="picker" aria-label="Cases to replay"></div>
+        <div class="card picker" id="picker" role="group" aria-label="Cases to replay"></div>
 
         <div class="stage">
-          <div class="card" style="overflow:hidden">
+          <div class="card mapcard">
             <div id="map" role="region" aria-label="Map of stations and events">
-              <div id="map-msg">The map library could not be loaded (no internet access to cdnjs?).<br>
+              <div id="map-msg">The map could not be loaded (no access to cdnjs?).<br>
                 Everything else on the page still works.</div>
-              <div class="legend" aria-hidden="true">
-                <div><span class="sw" style="border-color:#fff;background:#237a3b"></span>IU.MAJO (reference)</div>
-                <div><span class="sw" style="border-color:#fff;background:#495057"></span>neighbour station</div>
-                <div><span class="sw" style="border-color:#fff;background:#c92a2a"></span>station alarm</div>
-                <div><span class="sw" style="border-color:#e8590c;background:rgba(232,89,12,.25)"></span>event just confirmed</div>
-                <div><span class="sw" style="border-color:#1c6fd1;background:rgba(28,111,209,.22)"></span>earlier confirmed event</div>
-                <div><span style="width:12px;text-align:center">&#9733;</span>USGS epicentre (reference)</div>
-              </div>
+            </div>
+            <div class="legend" aria-hidden="true">
+              <span><i class="sw" style="border-color:#fff;background:#237a3b"></i>IU.MAJO (reference)</span>
+              <span><i class="sw" style="border-color:#fff;background:#495057"></i>neighbour station</span>
+              <span><i class="sw" style="border-color:#fff;background:#c92a2a"></i>station alarm</span>
+              <span><i class="sw" style="border-color:#e8590c;background:rgba(232,89,12,.25)"></i>event just confirmed</span>
+              <span><i class="sw" style="border-color:#1c6fd1;background:rgba(28,111,209,.22)"></i>earlier confirmed event</span>
+              <span>&#9733; USGS epicentre (reference only)</span>
             </div>
             <div class="controls">
-              <button class="btn primary" id="play" aria-pressed="false">&#9654; Play</button>
-              <button class="btn" id="restart" title="Back to the start">&#8634;<span class="sr-only"> Restart</span></button>
+              <button class="btn primary" id="play"><span aria-hidden="true">&#9654;</span> Play</button>
+              <button class="btn" id="restart" title="Back to the start"><span aria-hidden="true">&#8634;</span><span class="sr-only">Restart</span></button>
               <button class="btn" id="toorigin" title="Jump to 30 s before the earthquake">Jump to quake</button>
               <button class="btn" id="toend" title="Show the final state">Skip to end</button>
               <label class="sr-only" for="speed">Playback speed</label>
-              <select class="btn" id="speed">
+              <select class="btn" id="speed" autocomplete="off">
                 <option value="15">15×</option>
                 <option value="30">30×</option>
                 <option value="60" selected>60×</option>
@@ -331,7 +356,7 @@
                 <option value="300">300×</option>
               </select>
               <label class="sr-only" for="seek">Position in the recording</label>
-              <input type="range" id="seek" min="0" max="1000" step="1" value="0">
+              <input type="range" id="seek" min="0" max="1000" step="1" value="0" autocomplete="off">
               <div class="clock" aria-hidden="true"><b id="clock">--:--:--</b> UTC <span id="rel"></span></div>
             </div>
           </div>
@@ -345,12 +370,16 @@
                 <span><i style="background:var(--single)"></i>alarm not (yet) confirmed</span>
               </div>
             </div>
-            <div class="tracks" id="tracks" aria-label="Signals of all stations. Click to jump to a time."></div>
+            <div class="tracks" id="tracks"></div>
           </div>
         </div>
 
         <div class="side">
-          <div class="card info" id="info"></div>
+          <div class="card info">
+            <div id="loadmsg" role="status"></div>
+            <div id="info"></div>
+            <div id="outcome"></div>
+          </div>
           <div class="card">
             <h3>Confirmed network events</h3>
             <ul class="list" id="events"></ul>
@@ -361,7 +390,7 @@
           </div>
         </div>
       </div>
-      <div class="sr-only" aria-live="assertive" id="announce"></div>
+      <div class="sr-only" aria-live="polite" id="announce"></div>
     </div>
   </section>
 
@@ -387,7 +416,10 @@
         <p><b>Why a network?</b> One station is easily fooled by local disturbances: traffic, wind,
            a sensor glitch. A real earthquake shakes several stations within seconds of each other,
            so requiring three of them removes most false alarms. In the independent test the
-           single station raised about 0.9 false alarms per hour, the network about 0.33.</p>
+           reference station MAJO alone raised about <span id="p-majo">0.9</span> false alarms per
+           hour, the network about <span id="p-net">0.33</span> false events per hour. Some
+           neighbours are much noisier than MAJO on their own: JP.JSD, for example, often raises
+           an alarm every few minutes in quiet hours.</p>
         <p><b>Stations:</b> IU.MAJO (Matsushiro, the reference station) and four neighbours
            130–175 km away: JP.JGF, JP.JSD, G.INU and PS.TSK. Waveforms come from the EarthScope
            FDSN web services; the earthquake catalogue is USGS.</p>
@@ -409,8 +441,8 @@
       <div class="two" id="res-two"></div>
       <div class="card res" style="margin-top:12px">
         <h3>Independent test by magnitude and distance</h3>
-        <p class="sub">Share of earthquakes detected. Bars show the 95% Wilson interval; with 20
-           events per row, the intervals are wide.</p>
+        <p class="sub">Share of earthquakes detected, with the 95% Wilson interval. Magnitude rows
+           have 20 events each and distance rows as few as 2, so the intervals are wide.</p>
         <div class="table-wrap"><table id="bins"></table></div>
         <figure>
           <img src="data/step15_detection.png" alt="Fraction of new earthquakes detected versus magnitude, for MAJO alone and for the network, with 95% intervals." loading="lazy" width="1040" height="650">
@@ -419,6 +451,10 @@
         <details>
           <summary>All 60 earthquakes of the independent test</summary>
           <div class="table-wrap"><table id="evtable"></table></div>
+          <p class="tnote">“Confirmed” follows the test's definition: MAJO's first alarm within
+             150 s after the origin became part of an event with at least 3 stations. When MAJO had
+             no alarm, the event counts as missed even if the neighbours alone formed an event
+             (this happened for the deep earthquake of 2018-08-03).</p>
         </details>
       </div>
     </div>
@@ -434,22 +470,22 @@
         <li><b>Smaller earthquakes were not tested.</b> The independent test covers M4.5–5.7. Even
             the weakest group was still detected 80–90% of the time, so the lowest magnitude the
             system can see is still unknown.</li>
-        <li><b>Hard cases were left out.</b> Earthquakes with another M4+ event within about
-            10 minutes, and aftershocks within 30 minutes of an M5.5+ event, were excluded on
-            purpose. Real aftershock sequences will be harder.</li>
+        <li id="lim-hard"><b>Hard cases were left out.</b> Earthquakes with another M4+ event in
+            the region from 25 minutes before to 20 minutes after the origin, and earthquakes within
+            30 minutes after an M5.5+ earthquake in the region, were excluded on purpose. Real
+            aftershock sequences will be harder.</li>
         <li><b>“False” may not be false.</b> Quiet hours were checked only against the USGS
-            catalogue (M4+ in the region). Some network events in those hours may be real small
-            earthquakes that the catalogue does not list.</li>
+            catalogue (no M4+ in the study region). Some network events in those hours may be real
+            small earthquakes that the catalogue does not list.</li>
         <li><b>Few nearby events.</b> Only 2 of the 60 new earthquakes were closer than 150 km to
-            MAJO; most were 300–1000 km away.</li>
+            MAJO; most were more than 300 km away (up to about 1000 km).</li>
         <li><b>Small samples, clustered alarms.</b> False alarms come in bursts, so the per-hour
             rates are approximate (intervals from resampling whole hours).</li>
         <li><b>A small network.</b> With three of the five stations down, no event can be
             confirmed. The 2011 Tohoku earthquake had data from only 3 stations and was confirmed
             with no margin.</li>
-        <li><b>Confirmation speed was not measured systematically.</b> In the replayed earthquakes
-            above, the network confirmed the event about 30–80 s after the origin time (epicentres
-            133–417 km from MAJO); the further the earthquake, the later.</li>
+        <li id="lim-speed"><b>Confirmation speed was not measured systematically.</b> In the
+            replays above it ranged from about 30 to 80 s after the origin time.</li>
       </ul>
     </div>
   </section>
@@ -458,13 +494,13 @@
 <footer>
   <div class="wrap">
     <p>Data: waveforms from the EarthScope FDSN web services (networks IU, JP, G, PS);
-       earthquake catalogue: USGS; map: © OpenStreetMap contributors.
-       Numbers on this page are read from the project's result files when the site is built.
-       <span id="built"></span></p>
+       earthquake catalogue: USGS; map data &copy;
+       <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.
+       The test results on this page are read from the project's result files when the site is
+       built. <span id="built"></span></p>
   </div>
 </footer>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 "use strict";
 
@@ -473,18 +509,19 @@ const FLASH_S = 25;        // сколько секунд (времени дан
 const FRESH_S = 90;        // событие "свежее" первые 90 с после подтверждения
 const RING_PX = 15;        // радиус кольца вокруг станции (в пикселях, виден при любом масштабе)
 const REF = "IU.MAJO";
-const hasMap = typeof L !== "undefined";
+const LEAFLET_JS = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ---------- Состояние ----------
 const S = {
-  site: null, scn: null, cache: new Map(),
+  site: null, scn: null, cache: new Map(), loadSeq: 0,
   T: 0, playing: false, speed: 60, last: null,
-  nA: -1, nE: -1, freshKey: "", flashKey: "", outcomeShown: null,
+  nA: -1, nE: -1, freshKey: "", flashKey: "", listKey: "", outcomeShown: null,
   selEvent: null, alarmsSorted: [], eventsSorted: [],
 };
-let map = null;
-const stationLayers = new Map();   // код -> {marker, icon}
-const ringLayers = new Map();      // "событие|станция" -> круг
+let map = null;                    // карта появится, когда загрузится Leaflet
+const stationLayers = new Map();   // код -> {marker, icon, state}
+const ringLayers = new Map();      // "событие|станция" -> кольцо
 let epiLayer = null;
 
 // ---------- Вспомогательные ----------
@@ -499,6 +536,7 @@ const pct = (x) => Math.round(x * 100) + "%";
 const share = (s) => `${s.k}/${s.n}`;
 const ci = (s) => `${pct(s.lo)}–${pct(s.hi)}`;
 const signed = (s) => (s >= 0 ? "+" : "−") + Math.abs(Math.round(s)) + " s";
+const num = (x) => x.toLocaleString("en-US");
 function mmss(s) {
   const a = Math.abs(Math.round(s)), m = Math.floor(a / 60), r = a % 60;
   return (s < 0 ? "−" : "+") + m + ":" + String(r).padStart(2, "0");
@@ -508,7 +546,7 @@ async function getJSON(url) {
   if (!r.ok) throw new Error(url + ": " + r.status);
   return r.json();
 }
-// первый индекс, где key(a[i]) > x (массив отсортирован по key)
+// сколько элементов отсортированного массива имеют key <= x
 function countUpTo(a, key, x) {
   let lo = 0, hi = a.length;
   while (lo < hi) { const m = (lo + hi) >> 1; if (key(a[m]) <= x) lo = m + 1; else hi = m; }
@@ -531,7 +569,7 @@ function subtitleFor(sc) {
     const u = sc.usgs;
     return `${fmtDate(Date.parse(u.time) / 1000)} · ${u.depth} km deep · ${u.dist_km} km from MAJO`;
   }
-  return `${fmtDate(sc.start)} · 1 hour, no M4+ in catalogue`;
+  return `${fmtDate(sc.start)} · 1 hour, no M4+ in the region (USGS)`;
 }
 function shortTitle(sc) {
   if (sc.kind !== "quake") return "Quiet hour " + fmtDate(sc.start) + " " + fmtHM(sc.start);
@@ -555,30 +593,51 @@ function renderPicker() {
     }
   }
   $("picker").innerHTML = html;
-  $("picker").querySelectorAll(".scn").forEach((b) =>
-    b.addEventListener("click", () => selectScenario(b.dataset.id, true)));
+  $("picker").addEventListener("click", (ev) => {
+    const b = ev.target.closest(".scn");
+    if (b) selectScenario(b.dataset.id, true);
+  });
 }
 
-// ---------- Карта ----------
+// ---------- Карта (Leaflet грузится отдельно и может не загрузиться) ----------
+function showMapMsg() { $("map-msg").style.display = "flex"; }
+function loadLeaflet() {
+  const s = document.createElement("script");
+  s.src = LEAFLET_JS;
+  const timer = setTimeout(() => { if (!map) showMapMsg(); }, 15000);
+  s.onload = () => {
+    clearTimeout(timer);
+    if (typeof L === "undefined") { showMapMsg(); return; }
+    $("map-msg").style.display = "none";
+    initMap();
+    if (S.scn) { fitScenario(); S.flashKey = "~"; S.nA = -1; render(true); }
+  };
+  s.onerror = () => { clearTimeout(timer); showMapMsg(); };
+  document.head.appendChild(s);
+}
 function initMap() {
-  if (!hasMap) { $("map-msg").style.display = "flex"; return; }
-  map = L.map("map", { scrollWheelZoom: false }).setView([36.5, 138.5], 6);
+  map = L.map("map", {
+    scrollWheelZoom: false, zoomAnimation: !REDUCED, fadeAnimation: !REDUCED,
+    markerZoomAnimation: !REDUCED,
+  }).setView([36.5, 138.5], 6);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 12, attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 12,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
   for (const s of S.site.stations) {
     const icon = (state) => L.divIcon({
       className: "", iconSize: [16, 16], iconAnchor: [8, 8],
       html: `<div class="st-ico ${s.code === REF ? "ref" : ""} ${state}"></div>`,
     });
+    // подписи G.INU и JP.JGF стоят рядом: одну ставим слева, чтобы не налезали
+    const left = s.code === "G.INU";
     const marker = L.marker([s.lat, s.lon], { icon: icon(""), keyboard: false })
-      // подписи G.INU и JP.JGF стоят рядом: одну ставим слева, чтобы не налезали
-      .bindTooltip(s.code, { permanent: true, direction: s.code === "G.INU" ? "left" : "right",
-                             className: "st-label", offset: [s.code === "G.INU" ? -8 : 8, 0] })
+      .bindTooltip(s.code, { permanent: true, direction: left ? "left" : "right",
+                             className: "st-label", offset: [left ? -8 : 8, 0] })
+      .bindPopup(`<b>${esc(s.code)}</b> – ${esc(s.name)}` +
+                 (s.code === REF ? "<br>reference station" : ""))
       .addTo(map);
-    marker.bindPopup(`<b>${esc(s.code)}</b> – ${esc(s.name)}` +
-                     (s.code === REF ? "<br>reference station" : ""));
-    stationLayers.set(s.code, { marker, icon, state: "" });
+    stationLayers.set(s.code, { marker, icon, state: null });
   }
 }
 function setStationState(code, state) {
@@ -588,14 +647,15 @@ function setStationState(code, state) {
   st.marker.setIcon(st.icon(state));
 }
 function fitScenario() {
-  if (!hasMap) return;
+  if (!map || !S.scn) return;
   const pts = S.site.stations.map((s) => [s.lat, s.lon]);
   if (S.scn.usgs) pts.push([S.scn.usgs.lat, S.scn.usgs.lon]);
-  map.fitBounds(pts, { padding: [36, 36], maxZoom: 7 });
+  map.fitBounds(pts, { padding: [36, 36], maxZoom: 7, animate: !REDUCED });
 }
-function clearRings() {
+function clearMapLayers() {
   for (const c of ringLayers.values()) c.remove();
   ringLayers.clear();
+  if (epiLayer) { epiLayer.remove(); epiLayer = null; }
 }
 
 // ---------- Дорожки сигналов (SVG без библиотек) ----------
@@ -610,7 +670,9 @@ function buildTracks() {
     if (!tr) {
       plot = `<div class="nodata">no data for this recording</div>`;
     } else {
-      label += `<small>${esc(tr.channel.split(".").slice(2).join("."))}, ${tr.rate} Hz</small>`;
+      const parts = tr.channel.split(".");          // сеть.станция.место.канал
+      const chan = (parts[2] || "--") + "." + parts[3];
+      label += `<small>${esc(chan)}, ${tr.rate} Hz</small>`;
       const x0 = tr.t0 - sc.start, n = tr.hi.length;
       // огибающая: верхняя граница вперёд, нижняя назад; полоса y 2..60
       let d = "M" + x0.toFixed(1) + "," + (31 - tr.hi[0] * 0.29).toFixed(1);
@@ -629,7 +691,7 @@ function buildTracks() {
         }
       });
       const orig = sc.origin ? `<line class="orig" x1="${xOf(sc.origin)}" x2="${xOf(sc.origin)}" y1="0" y2="100" vector-effect="non-scaling-stroke"/>` : "";
-      plot = `<svg viewBox="0 0 ${W} 100" preserveAspectRatio="none" aria-hidden="true">` +
+      plot = `<svg viewBox="0 0 ${W} 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">` +
         `<line class="sep" x1="0" x2="${W}" y1="63" y2="63" vector-effect="non-scaling-stroke"/>` +
         `<path class="env" d="${d}"/>` +
         `<line class="thr" x1="0" x2="${W}" y1="${thr}" y2="${thr}" vector-effect="non-scaling-stroke"/>` +
@@ -638,37 +700,71 @@ function buildTracks() {
     }
     html += `<div class="track"><div class="tlabel">${label}</div><div class="tplot">${plot}</div></div>`;
   }
-  // ось времени: метки каждые 5 (запись землетрясения) или 10 (час) минут
-  const step = W > 2000 ? 600 : 300;
-  let axis = "";
-  const first = Math.ceil(sc.start / step) * step;
-  for (let t = first; t <= sc.end + 0.1; t += step) {
+  html += `<div class="taxis" id="taxis" aria-hidden="true"></div><div class="future"></div><div class="playhead"></div>`;
+  $("tracks").innerHTML = html;
+  buildAxis();
+}
+// ось времени: шаг меток подбирается под ширину, чтобы подписи не налезали
+function buildAxis() {
+  const sc = S.scn, el = $("taxis");
+  if (!sc || !el) return;
+  const W = sc.end - sc.start;
+  const px = el.getBoundingClientRect().width || 600;
+  const step = [60, 120, 300, 600, 900, 1200, 1800, 3600].find((s) => (s / W) * px >= 70) || 3600;
+  let html = "";
+  for (let t = Math.ceil(sc.start / step) * step; t <= sc.end + 0.1; t += step) {
     const f = (t - sc.start) / W;
-    const cls = f < 0.04 ? "first" : f > 0.96 ? "last" : "";
-    axis += `<span class="${cls}" style="left:${(f * 100).toFixed(2)}%">${fmtHM(t)}</span>`;
+    const x = f * px;
+    if (x < 20 || x > px - 20) {      // у краёв подпись прижимаем к краю
+      const cls = x < 20 ? "first" : "last";
+      html += `<span class="${cls}" style="left:${(f * 100).toFixed(2)}%">${fmtHM(t)}</span>`;
+    } else {
+      html += `<span style="left:${(f * 100).toFixed(2)}%">${fmtHM(t)}</span>`;
+    }
   }
   if (sc.origin) {
     const f = (sc.origin - sc.start) / W;
-    axis += `<span style="left:${(f * 100).toFixed(2)}%;top:-1px;font-weight:600">origin</span>`;
+    html += `<span class="orig-l" style="left:${(f * 100).toFixed(2)}%">origin</span>`;
   }
-  html += `<div class="taxis">${axis}</div><div class="future"></div><div class="playhead"></div>`;
-  $("tracks").innerHTML = html;
+  el.innerHTML = html;
 }
 
-// клик или перетаскивание по дорожкам: переход ко времени
+// клик или перетаскивание по дорожкам: переход ко времени.
+// Мышь: тащим. Палец: только короткое касание (чтобы прокрутка страницы не перематывала).
 function setupTrackSeek() {
   const el = $("tracks");
-  let dragging = false;
-  const seekFrom = (ev) => {
+  let drag = null;
+  const fraction = (ev) => {
     const r = el.getBoundingClientRect();
     const lw = parseFloat(getComputedStyle(el).getPropertyValue("--lw")) || 0;
-    const f = (ev.clientX - r.left - lw) / (r.width - lw);
-    if (f < 0 || f > 1) return;
-    seekTo(S.scn.start + f * (S.scn.end - S.scn.start));
+    return (ev.clientX - r.left - lw) / (r.width - lw);
   };
-  el.addEventListener("pointerdown", (ev) => { dragging = true; seekFrom(ev); });
-  window.addEventListener("pointermove", (ev) => { if (dragging) seekFrom(ev); });
-  window.addEventListener("pointerup", () => { dragging = false; });
+  const seekF = (f) => { if (S.scn) seekTo(S.scn.start + Math.min(1, Math.max(0, f)) * (S.scn.end - S.scn.start)); };
+  el.addEventListener("pointerdown", (ev) => {
+    if (!S.scn || ev.button > 0) return;
+    const f = fraction(ev);
+    if (f < 0 || f > 1) return;            // нажали на подпись станции
+    drag = { id: ev.pointerId, touch: ev.pointerType !== "mouse", x: ev.clientX, y: ev.clientY, moved: false };
+    if (!drag.touch) {
+      ev.preventDefault();
+      el.setPointerCapture(ev.pointerId);
+      seekF(f);
+    }
+  });
+  el.addEventListener("pointermove", (ev) => {
+    if (!drag || ev.pointerId !== drag.id) return;
+    if (drag.touch) {
+      if (Math.abs(ev.clientX - drag.x) > 10 || Math.abs(ev.clientY - drag.y) > 10) drag.moved = true;
+    } else {
+      seekF(fraction(ev));
+    }
+  });
+  el.addEventListener("pointerup", (ev) => {
+    if (drag && ev.pointerId === drag.id && drag.touch && !drag.moved) seekF(fraction(ev));
+    drag = null;
+  });
+  el.addEventListener("pointercancel", () => { drag = null; });
+  el.addEventListener("lostpointercapture", () => { if (drag && !drag.touch) drag = null; });
 }
 
 // ---------- Информация о сценарии ----------
@@ -683,11 +779,11 @@ function renderInfo() {
             `<dt>Depth</dt><dd>${u.depth} km</dd>` +
             `<dt>Distance to MAJO</dt><dd>${u.dist_km} km</dd>`;
   } else {
-    html += `<dt>Window</dt><dd>${fmtClock(sc.start)}–${fmtClock(sc.end)} UTC</dd>`;
+    html += `<dt>Window</dt><dd>${fmtClock(sc.start)}–${fmtClock(sc.start + 3600)} UTC</dd>`;
   }
   html += `<dt>Stations with data</dt><dd>${5 - sc.missing.length} of 5` +
           (sc.missing.length ? ` <span class="muted">(no data: ${sc.missing.map(esc).join(", ")})</span>` : "") +
-          `</dd></dl><div id="outcome"></div>`;
+          `</dd></dl>`;
   $("info").innerHTML = html;
   S.outcomeShown = null;
 }
@@ -695,7 +791,7 @@ function outcomeHTML(sc) {
   const o = sc.outcome;
   if (sc.kind === "quake") {
     const cls = o.confirmed ? "ok" : "bad";
-    const a = o.detected ? `MAJO alarm ${signed(o.delay)} after origin` : "MAJO raised no alarm within 150 s";
+    const a = o.detected ? `MAJO alarm ${signed(o.delay)} after origin` : "MAJO raised no alarm within 150 s after the origin";
     const b = o.confirmed ? `the network confirmed it ${signed(o.confirm_delay)} after origin` :
       (o.detected ? "the network did not confirm it (fewer than 3 stations alarmed)" : "so by our definition it counts as missed");
     const c = !o.detected && o.any_event_delay !== null
@@ -710,7 +806,11 @@ function outcomeHTML(sc) {
 
 // ---------- Отрисовка состояния на момент T ----------
 function render(force) {
-  const sc = S.scn, T = S.T, W = sc.end - sc.start;
+  const sc = S.scn;
+  if (!sc) return;
+  const T = S.T, W = sc.end - sc.start;
+  const atEnd = T >= sc.end - 1e-6;
+  const Tc = atEnd ? Infinity : T;        // в самом конце показываем всё, что сервер сообщил
   const f = Math.min(1, Math.max(0, (T - sc.start) / W));
   $("tracks").style.setProperty("--f", f.toFixed(5));
   $("seek").value = Math.round(f * 1000);
@@ -718,8 +818,8 @@ function render(force) {
   $("rel").textContent = sc.origin ? `(origin ${mmss(T - sc.origin)})` : "";
   $("seek").setAttribute("aria-valuetext", fmtClock(T) + " UTC");
 
-  const nA = countUpTo(S.alarmsSorted, (a) => a.detected_at, T);
-  const nE = countUpTo(S.eventsSorted, (e) => e.confirmed_at, T);
+  const nA = countUpTo(S.alarmsSorted, (a) => a.detected_at, Tc);
+  const nE = countUpTo(S.eventsSorted, (e) => e.confirmed_at, Tc);
   const confirmedNow = new Set(S.eventsSorted.slice(0, nE).map((e) => e.id));
   const freshKey = S.eventsSorted.slice(0, nE).map((e) => (T - e.confirmed_at < FRESH_S ? 1 : 0)).join("");
 
@@ -740,17 +840,16 @@ function render(force) {
       $("announce").textContent = `Network event confirmed at ${fmtClock(e.confirmed_at)} UTC`;
     }
     S.nA = nA; S.nE = nE; S.freshKey = freshKey;
-    // линии тревог на дорожках
     const known = new Set(S.alarmsSorted.slice(0, nA).map((a) => a.id));
     document.querySelectorAll("#tracks .al").forEach((el) => {
       const a = sc.alarms[+el.dataset.k];
-      const on = known.has(a.id);
-      el.classList.toggle("on", on);
+      el.classList.toggle("on", known.has(a.id));
       const inEv = a.event !== null && confirmedNow.has(a.event);
       el.classList.toggle("ev", inEv);
       el.classList.toggle("single", !inEv);
     });
-    renderLists(nA, nE, confirmedNow);
+    renderEvents(nA, nE, force);
+    renderAlarms(nA, confirmedNow);
     renderRings(nA, nE);
   }
   renderEpicentre();
@@ -767,41 +866,47 @@ function render(force) {
   }
 }
 
-function renderLists(nA, nE, confirmedNow) {
+// список событий перестраиваем, только когда меняется его содержимое; фокус сохраняем
+function renderEvents(nA, nE, force) {
   const sc = S.scn, T = S.T;
-  const evs = S.eventsSorted.slice(0, nE).slice().reverse();
-  $("events").innerHTML = evs.length ? evs.map((e) => {
-    const stations = S.alarmsSorted.slice(0, nA).filter((a) => a.event === e.id).map((a) => a.station);
-    const uniq = [...new Set(stations)];
-    const fresh = T - e.confirmed_at < FRESH_S;
-    const rel = sc.origin ? ` · ${signed(e.confirmed_at - sc.origin)} after origin` : "";
-    return `<li class="evt${S.selEvent === e.id ? " sel" : ""}" data-id="${e.id}" tabindex="0">` +
-      `<b>${fmtClock(e.confirmed_at)}</b> confirmed${esc(rel)} ${fresh ? '<span class="chip new">new</span>' : ""}<br>` +
-      `<span class="muted">${uniq.length} stations: ${uniq.map(esc).join(", ")}</span></li>`;
-  }).join("") : `<li class="empty">None yet.</li>`;
-  $("events").querySelectorAll(".evt").forEach((li) => {
-    const pick = () => { S.selEvent = Number(li.dataset.id); S.nA = -1; render(true); focusEvent(S.selEvent); };
-    li.addEventListener("click", pick);
-    li.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
+  const known = S.alarmsSorted.slice(0, nA);
+  const evs = S.eventsSorted.slice(0, nE).slice().reverse().map((e) => {
+    const st = [...new Set(known.filter((a) => a.event === e.id).map((a) => a.station))];
+    return { e, st, fresh: T - e.confirmed_at < FRESH_S };
   });
+  const key = evs.map((x) => `${x.e.id}:${x.st.length}:${x.fresh ? 1 : 0}`).join("|") + "#" + S.selEvent;
+  if (key === S.listKey && !force) return;
+  S.listKey = key;
+  const ul = $("events");
+  const focused = ul.contains(document.activeElement) ? document.activeElement.dataset.id : null;
+  ul.innerHTML = evs.length ? evs.map(({ e, st, fresh }) => {
+    const rel = sc.origin ? ` · ${signed(e.confirmed_at - sc.origin)} after origin` : "";
+    return `<li><button class="evt" data-id="${e.id}" aria-current="${S.selEvent === e.id}">` +
+      `<b>${fmtClock(e.confirmed_at)}</b> confirmed${esc(rel)} ${fresh ? '<span class="chip new">new</span>' : ""}<br>` +
+      `<span class="muted">${st.length} stations: ${st.map(esc).join(", ")}</span></button></li>`;
+  }).join("") : `<li class="empty">None yet.</li>`;
+  if (focused) {
+    const b = ul.querySelector(`.evt[data-id="${focused}"]`);
+    if (b) b.focus({ preventScroll: true });
+  }
+}
 
-  const als = S.alarmsSorted.slice(0, nA).slice(-40).reverse();
+function renderAlarms(nA, confirmedNow) {
+  const als = S.alarmsSorted.slice(0, nA).slice().reverse();
   $("alarms").innerHTML = als.length ? als.map((a) => {
     const inEv = a.event !== null && confirmedNow.has(a.event);
     return `<li>${fmtClock(a.ts)} <b>${esc(a.station)}</b> <span class="muted">STA/LTA ${a.peak}</span> ` +
-      (inEv ? `<span class="chip ev">in event</span>` : `<span class="chip single">single station</span>`) + `</li>`;
-  }).join("") + (nA > 40 ? `<li class="empty">… and ${nA - 40} earlier</li>` : "")
-    : `<li class="empty">None yet.</li>`;
+      (inEv ? `<span class="chip ev">in event</span>` : `<span class="chip single">not confirmed</span>`) + `</li>`;
+  }).join("") : `<li class="empty">None yet.</li>`;
 }
 
 function renderRings(nA, nE) {
-  if (!hasMap) return;
+  if (!map) return;
   const T = S.T, want = new Map();
   for (const e of S.eventsSorted.slice(0, nE)) {
     const fresh = T - e.confirmed_at < FRESH_S, sel = S.selEvent === e.id;
     for (const a of S.alarmsSorted.slice(0, nA)) {
-      if (a.event !== e.id) continue;
-      want.set(e.id + "|" + a.station, { e, a, fresh, sel });
+      if (a.event === e.id) want.set(e.id + "|" + a.station, { e, a, fresh, sel });
     }
   }
   for (const [k, c] of ringLayers) if (!want.has(k)) { c.remove(); ringLayers.delete(k); }
@@ -813,7 +918,7 @@ function renderRings(nA, nE) {
       c = L.circleMarker([st.lat, st.lon], { radius: RING_PX, weight: 2, interactive: true })
         .bindTooltip(`Event confirmed ${fmtClock(w.e.confirmed_at)} UTC – ${esc(w.a.station)}`)
         .addTo(map);
-      c.on("click", () => { S.selEvent = w.e.id; S.nA = -1; render(true); });
+      c.on("click", () => pickEvent(w.e.id, false));
       ringLayers.set(k, c);
     }
     const color = w.fresh ? "#e8590c" : "#1c6fd1";
@@ -824,7 +929,7 @@ function renderRings(nA, nE) {
 }
 
 function renderEpicentre() {
-  if (!hasMap || !S.scn.usgs) return;
+  if (!map || !S.scn || !S.scn.usgs) return;
   const show = S.T >= S.scn.origin;
   if (show && !epiLayer) {
     const u = S.scn.usgs;
@@ -837,19 +942,24 @@ function renderEpicentre() {
   }
 }
 
-function focusEvent(id) {
-  if (!hasMap) return;
-  const pts = S.scn.alarms.filter((a) => a.event === id)
-    .map((a) => S.site.stations.find((s) => s.code === a.station)).filter(Boolean)
-    .map((s) => [s.lat, s.lon]);
-  if (pts.length) map.fitBounds(pts, { padding: [60, 60], maxZoom: 8 });
+function pickEvent(id, zoom) {
+  S.selEvent = id;
+  S.nA = -1;
+  render(true);
+  if (zoom && map) {
+    const pts = S.scn.alarms.filter((a) => a.event === id)
+      .map((a) => S.site.stations.find((s) => s.code === a.station)).filter(Boolean)
+      .map((s) => [s.lat, s.lon]);
+    if (pts.length) map.fitBounds(pts, { padding: [60, 60], maxZoom: 8, animate: !REDUCED });
+  }
 }
 
 // ---------- Управление проигрыванием ----------
 function setPlaying(on) {
+  if (on && !S.scn) return;
   S.playing = on;
-  $("play").innerHTML = on ? "&#10074;&#10074; Pause" : "&#9654; Play";
-  $("play").setAttribute("aria-pressed", String(on));
+  $("play").innerHTML = on ? '<span aria-hidden="true">&#10074;&#10074;</span> Pause'
+                           : '<span aria-hidden="true">&#9654;</span> Play';
   if (on) {
     if (S.T >= S.scn.end) { S.T = S.scn.start; S.nA = -1; }
     S.last = null;
@@ -857,7 +967,7 @@ function setPlaying(on) {
   }
 }
 function frame(now) {
-  if (!S.playing) return;
+  if (!S.playing || !S.scn) return;
   if (S.last !== null) {
     const dt = Math.min(0.25, (now - S.last) / 1000);   // после вкладки в фоне не прыгаем
     S.T = Math.min(S.scn.end, S.T + dt * S.speed);
@@ -868,28 +978,44 @@ function frame(now) {
   else requestAnimationFrame(frame);
 }
 function seekTo(T) {
+  if (!S.scn) return;
   S.T = Math.min(S.scn.end, Math.max(S.scn.start, T));
   S.last = null;
   render(false);
 }
+function setControlsEnabled(on) {
+  for (const id of ["play", "restart", "toorigin", "toend", "speed", "seek"]) $(id).disabled = !on;
+}
 
 async function selectScenario(id, fromUser) {
   setPlaying(false);
+  const my = ++S.loadSeq;                  // более поздний выбор отменяет ранний
   let sc = S.cache.get(id);
   if (!sc) {
-    $("info").innerHTML = `<div class="empty">Loading…</div>`;
-    try { sc = await getJSON(`data/scn_${encodeURIComponent(id)}.json`); }
-    catch (e) { $("info").innerHTML = `<div class="empty">Could not load this case (${esc(e.message)}).</div>`; return; }
+    $("loadmsg").textContent = "Loading…";
+    setControlsEnabled(false);
+    try {
+      sc = await getJSON(`data/scn_${encodeURIComponent(id)}.json`);
+    } catch (e) {
+      if (my !== S.loadSeq) return;
+      $("loadmsg").textContent = `Could not load this case (${e.message}). Try another one.`;
+      setControlsEnabled(!!S.scn);
+      return;
+    }
     S.cache.set(id, sc);
+    if (my !== S.loadSeq) return;
   }
+  setPlaying(false);
+  $("loadmsg").textContent = "";
+  setControlsEnabled(true);
   S.scn = sc;
   S.alarmsSorted = sc.alarms.slice().sort((a, b) => a.detected_at - b.detected_at);
   S.eventsSorted = sc.events.slice().sort((a, b) => a.confirmed_at - b.confirmed_at);
-  S.T = sc.start; S.nA = -1; S.nE = -1; S.freshKey = ""; S.flashKey = ""; S.selEvent = null;
+  S.T = sc.start; S.nA = -1; S.nE = -1; S.freshKey = ""; S.flashKey = "~"; S.listKey = ""; S.selEvent = null;
   document.querySelectorAll("#picker .scn").forEach((b) =>
     b.setAttribute("aria-current", String(b.dataset.id === id)));
   $("toorigin").hidden = sc.kind !== "quake";
-  if (hasMap) { clearRings(); if (epiLayer) { epiLayer.remove(); epiLayer = null; } }
+  clearMapLayers();
   buildTracks();
   renderInfo();
   fitScenario();
@@ -907,7 +1033,9 @@ function renderResults() {
   $("tiles").innerHTML =
     `<div class="tile"><b>${share(ind.quakes.net)}</b><span>new earthquakes (M4.5–5.7) confirmed by the network</span><small>95% interval ${ci(ind.quakes.net)}</small></div>` +
     `<div class="tile"><b>${nf.rate.toFixed(2)} / hour</b><span>false network events in ${ind.hours} quiet hours</span><small>interval ${nf.boot[0].toFixed(2)}–${nf.boot[1].toFixed(2)}</small></div>` +
-    `<div class="tile"><b>${mf.rate.toFixed(2)} / hour</b><span>false alarms of one station alone, same hours</span><small>interval ${mf.boot[0].toFixed(2)}–${mf.boot[1].toFixed(2)}</small></div>`;
+    `<div class="tile"><b>${mf.rate.toFixed(2)} / hour</b><span>false alarms of the reference station MAJO alone, same hours</span><small>interval ${mf.boot[0].toFixed(2)}–${mf.boot[1].toFixed(2)}</small></div>`;
+  $("p-majo").textContent = mf.rate.toFixed(2);
+  $("p-net").textContent = nf.rate.toFixed(2);
 
   $("res-two").innerHTML =
     `<div class="card res"><h3>Independent test</h3>
@@ -915,13 +1043,13 @@ function renderResults() {
         Definitions were committed before the run.</p>
       <div class="stat"><span>Detected by MAJO alone<small>alarm 0–150 s after origin</small></span><span><b>${share(ind.quakes.majo)}</b> (${ci(ind.quakes.majo)})</span></div>
       <div class="stat"><span>Confirmed by the network<small>that alarm is part of a 3-of-5 event</small></span><span><b>${share(ind.quakes.net)}</b> (${ci(ind.quakes.net)})</span></div>
-      <div class="stat"><span>False alarms, one station</span><span><b>${mf.count}</b> = ${mf.rate.toFixed(2)}/h (${mf.boot[0].toFixed(2)}–${mf.boot[1].toFixed(2)})</span></div>
+      <div class="stat"><span>False alarms, MAJO alone</span><span><b>${mf.count}</b> = ${mf.rate.toFixed(2)}/h (${mf.boot[0].toFixed(2)}–${mf.boot[1].toFixed(2)})</span></div>
       <div class="stat"><span>False events, network<small>${ind.net_false_without_majo} of them without any MAJO alarm</small></span><span><b>${nf.count}</b> = ${nf.rate.toFixed(2)}/h (${nf.boot[0].toFixed(2)}–${nf.boot[1].toFixed(2)})</span></div>
     </div>
     <div class="card res"><h3>Tuning data (optimistic)</h3>
       <p class="sub">The data used to choose the settings: ${tu.quakes.n} earthquakes and ${tu.hours} quiet hours.</p>
       <div class="stat"><span>Earthquakes confirmed by the network<small>${tu.quakes.n - (tohoku ? 1 : 0)} events M${magRange}${tohoku ? ` and the 2011 Tohoku earthquake (M${tohoku.mag})` : ""}</small></span><span><b>${share(tu.quakes)}</b></span></div>
-      <div class="stat"><span>False alarms, one station</span><span><b>${tu.majo_alarms}</b> = ${(tu.majo_alarms / tu.hours).toFixed(2)}/h</span></div>
+      <div class="stat"><span>False alarms, MAJO alone</span><span><b>${tu.majo_alarms}</b> = ${(tu.majo_alarms / tu.hours).toFixed(2)}/h</span></div>
       <div class="stat"><span>False events, network</span><span><b>${tu.net_events}</b> = ${(tu.net_events / tu.hours).toFixed(2)}/h</span></div>
       <p class="sub" style="margin-top:8px">On the new hours the network's false-event rate was higher
         (${nf.rate.toFixed(2)}/h instead of ${(tu.net_events / tu.hours).toFixed(2)}/h): the tuning numbers were too optimistic.</p>
@@ -930,7 +1058,7 @@ function renderResults() {
   const bar = (s, cls) => `<div class="cibar ${cls}" title="${share(s)}, 95% interval ${ci(s)}">` +
     `<div class="rng" style="left:${s.lo * 100}%;width:${(s.hi - s.lo) * 100}%"></div>` +
     `<div class="pt" style="left:calc(${(s.k / s.n) * 100}% - 1.5px)"></div></div>`;
-  let rows = `<thead><tr><th>Group</th><th class="num">Events</th><th>MAJO alone</th><th></th><th>Network (3 of 5)</th><th></th></tr></thead><tbody>`;
+  let rows = `<thead><tr><th>Group</th><th class="num">Events</th><th>MAJO alone</th><th><span class="sr-only">interval</span></th><th>Network (3 of 5)</th><th><span class="sr-only">interval</span></th></tr></thead><tbody>`;
   for (const kind of ["mag", "dist"]) {
     rows += `<tr><td colspan="6" class="muted" style="font-size:12px;padding-top:10px">${kind === "mag" ? "By magnitude" : "By distance to MAJO"}</td></tr>`;
     for (const b of ind.bins.filter((x) => x.kind === kind)) {
@@ -943,40 +1071,72 @@ function renderResults() {
 
   const evs = ind.events.slice().sort((a, b) => a.mag - b.mag || a.dist - b.dist);
   $("evtable").innerHTML = `<thead><tr><th>Origin time (UTC)</th><th class="num">M</th><th class="num">Depth, km</th>` +
-    `<th class="num">Distance, km</th><th class="num">MAJO alarm</th><th class="num">Stations alarmed</th><th>Network</th></tr></thead><tbody>` +
+    `<th class="num">Distance, km</th><th class="num">MAJO alarm</th><th class="num">Stations alarmed</th><th>Confirmed</th></tr></thead><tbody>` +
     evs.map((e) => `<tr><td>${esc(e.time.replace("T", " "))}</td><td class="num">${e.mag.toFixed(1)}</td>` +
       `<td class="num">${e.depth ?? "?"}</td><td class="num">${e.dist}</td>` +
       `<td class="num">${e.delay === null ? '<span class="no">none</span>' : "+" + e.delay + " s"}</td>` +
       `<td class="num">${e.stations_alarmed} of ${e.stations_with_data}</td>` +
-      `<td>${e.confirmed ? '<span class="yes">confirmed</span>' : '<span class="no">not confirmed</span>'}</td></tr>`).join("") +
+      `<td>${e.confirmed ? '<span class="yes">yes</span>' : '<span class="no">no</span>'}</td></tr>`).join("") +
     `</tbody>`;
+
+  // ограничения: цифры отбора и скорости подтверждения берём из данных, а не пишем руками
+  const fu = ind.funnel;
+  if (fu) {
+    $("lim-hard").innerHTML = `<b>Hard cases were left out.</b> Earthquakes with another M4+ event in
+      the region from 25 minutes before to 20 minutes after the origin (${num(fu.other_m4)} of
+      ${num(fu.m45_57)} candidates), and earthquakes within 30 minutes after an M5.5+ earthquake in
+      the region (${num(fu.aftershock)}), were excluded on purpose. Real aftershock sequences will be harder.`;
+  }
+  const conf = S.site.scenarios.filter((s) => s.kind === "quake" && s.outcome.confirmed)
+    .sort((a, b) => a.usgs.dist_km - b.usgs.dist_km);
+  if (conf.length) {
+    const list = conf.map((s) => `${s.outcome.confirm_delay} s (${s.usgs.dist_km} km away)`).join(", ");
+    const chiba = conf.find((s) => s.id === "chiba-2021");
+    $("lim-speed").innerHTML = `<b>Confirmation speed was not measured systematically.</b> In the
+      ${conf.length} replayed earthquakes that the network confirmed, confirmation came ${list}
+      after the origin time; with so few cases there is no clear trend with distance.` +
+      (chiba ? ` The fastest case (Chiba 2021, ${chiba.outcome.confirm_delay} s) counted a noise alarm of
+      JP.JSD from 13 s before the origin; without it, confirmation would have come about 10 s later.` : "");
+  }
   $("built").textContent = `Site built ${S.site.built.replace("T", " ").replace("Z", " UTC")}.`;
 }
 
 // ---------- Запуск ----------
 async function main() {
+  setControlsEnabled(false);
   try {
     S.site = await getJSON("data/site.json");
   } catch (e) {
     document.querySelector(".hero").insertAdjacentHTML("beforeend",
-      `<p style="color:var(--bad)">Could not load the site data (${esc(e.message)}).</p>`);
+      `<p style="color:var(--bad)">Could not load the site data (${esc(e.message)}). Please reload the page.</p>`);
+    $("loadmsg").textContent = "Site data could not be loaded.";
     return;
   }
   renderResults();
   renderPicker();
-  initMap();
+  loadLeaflet();
   setupTrackSeek();
+  // скорость: берём из списка (браузер мог восстановить его после "Назад")
+  const readSpeed = () => { S.speed = Number($("speed").value) || 60; };
+  readSpeed();
+  window.addEventListener("pageshow", readSpeed);
+  $("speed").addEventListener("change", readSpeed);
   $("play").addEventListener("click", () => setPlaying(!S.playing));
-  $("restart").addEventListener("click", () => { S.nA = -1; seekTo(S.scn.start); });
-  $("toend").addEventListener("click", () => { setPlaying(false); seekTo(S.scn.end); });
-  $("toorigin").addEventListener("click", () => { if (S.scn.origin) seekTo(S.scn.origin - 30); });
-  $("speed").addEventListener("change", (e) => { S.speed = Number(e.target.value); });
+  $("restart").addEventListener("click", () => { if (S.scn) { S.nA = -1; seekTo(S.scn.start); } });
+  $("toend").addEventListener("click", () => { if (S.scn) { setPlaying(false); seekTo(S.scn.end); } });
+  $("toorigin").addEventListener("click", () => { if (S.scn && S.scn.origin) seekTo(S.scn.origin - 30); });
   $("seek").addEventListener("input", (e) => {
-    seekTo(S.scn.start + (Number(e.target.value) / 1000) * (S.scn.end - S.scn.start));
+    if (S.scn) seekTo(S.scn.start + (Number(e.target.value) / 1000) * (S.scn.end - S.scn.start));
+  });
+  $("events").addEventListener("click", (ev) => {
+    const b = ev.target.closest(".evt");
+    if (b) pickEvent(Number(b.dataset.id), true);
   });
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target === document.body) { e.preventDefault(); setPlaying(!S.playing); }
   });
+  let rt = null;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(buildAxis, 150); });
   window.addEventListener("hashchange", () => {
     const h = location.hash.match(/case=([\w-]+)/);
     if (h && S.site.scenarios.some((s) => s.id === h[1]) && (!S.scn || S.scn.id !== h[1])) selectScenario(h[1], false);
