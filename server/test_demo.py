@@ -1,4 +1,4 @@
-"""Проверки подготовки демо (prepare_demo, wait_server) без интернета."""
+"""checks of the demo preparation (prepare_demo, wait_server) without internet"""
 
 import pytest
 
@@ -9,7 +9,7 @@ from step13 import cache_path
 
 @pytest.fixture
 def project(tmp_path, monkeypatch):
-    """Пустая папка проекта: только запись MAJO, как в репозитории."""
+    """empty project folder: only the MAJO record, as in the repository"""
     monkeypatch.chdir(tmp_path)
     (tmp_path / prepare_demo.MAJO_FILE).write_bytes(b"x")
     return tmp_path
@@ -66,7 +66,7 @@ def test_too_few_stations_with_data(project, monkeypatch, capsys):
 def test_wait_server_free_and_busy(monkeypatch, capsys):
     monkeypatch.setattr(wait_server, "answers", lambda: False)
     assert wait_server.main(["--free"]) == 0
-    assert wait_server.main(["1"]) == 1  # сервер так и не ответил
+    assert wait_server.main(["1"]) == 1  # the server never answered
     monkeypatch.setattr(wait_server, "answers", lambda: True)
     assert wait_server.main(["--free"]) == 1
     assert "8000" in capsys.readouterr().out

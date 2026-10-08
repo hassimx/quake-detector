@@ -1,16 +1,18 @@
-"""Шаг 14: прогон 10 землетрясений и 24 тихих часов через сервер.
+"""step 14: run 10 earthquakes and 24 quiet hours through the server.
 
-Запуск из корня проекта (Windows):
+Run from the project root (Windows):
     .venv\\Scripts\\python -m server.evaluate
 Linux/macOS:
     .venv/bin/python -m server.evaluate
 
-Каждый сценарий (землетрясение или тихий час) для каждого значения
-QUAKE_MIN_STATIONS (2 и 3) идёт через сервер (TestClient) со своей временной
-базой. Тихие часы берём из results/step13_output.txt (те самые 24 часа, не
-новые). Потом сравниваем с пакетными цифрами step13 (R1 и R2) и ищем причины
-расхождений. Вывод: results/step14_output.txt. Файлы step1-13 и параметры
-детектора не трогаем; записи нужны в data/ (их скачал step13.py).
+Each scenario (an earthquake or a quiet hour) goes through the server
+(TestClient) with its own temporary database, once for each value of
+QUAKE_MIN_STATIONS (2 and 3). The quiet hours are taken from
+results/step13_output.txt (the same 24 hours, not new ones). Then we compare
+with the batch numbers of step13 (R1 and R2) and look for the causes of the
+differences. Output: results/step14_output.txt. The files step1-13 and the
+detector parameters are not touched; the records are needed in data/
+(downloaded by step13.py).
 """
 
 import contextlib
@@ -34,16 +36,14 @@ OUTPUT_FILE = os.path.join("results", "step14_output.txt")
 STEP13_FILE = os.path.join("results", "step13_output.txt")
 MAJO = "IU.MAJO"
 MIN_STATIONS_VALUES = (2, 3)
-EQ_WINDOW = 120   # "замечено": тревога в 0..+120 с после очага (как в step7)
-MATCH_TOL = 3     # тревоги потока и пакета считаем одной, если разница <= 3 с
-CHUNK_SEC = 10    # длина куска при воспроизведении
+EQ_WINDOW = 120   # "detected": an alarm within 0..+120 s after the origin time (as in step7)
+MATCH_TOL = 3     # stream and batch alarms count as the same if they differ by <= 3 s
+CHUNK_SEC = 10    # chunk length during replay
 
 
-# ---------------------------------------------------------------------------
-# Входные данные: часы и цифры step13 берём из его вывода, ничего не придумываем.
-# ---------------------------------------------------------------------------
+# input data: the hours and numbers of step13 come from its output, nothing is invented
 def quiet_hours_from_step13(path):
-    """24 принятых тихих часа из вывода step13 (вид '2016-06-11T17')."""
+    """the 24 accepted quiet hours from the step13 output (like '2016-06-11T17')"""
     hours, candidate = [], None
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -54,12 +54,12 @@ def quiet_hours_from_step13(path):
                 hours.append(candidate)
                 candidate = None
             elif re.match(r"^\d{4}-\d\d-\d\dT\d\d:00:", line):
-                candidate = None  # "не тихий" или пропущенный час
+                candidate = None  # not "quiet" or a skipped hour
     return hours
 
 
 def step13_table(path):
-    """Строки R0-R3 из итоговой таблицы step13."""
+    """rows R0-R3 from the step13 summary table"""
     rows = {}
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -73,11 +73,9 @@ def step13_table(path):
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Работа в отдельных процессах: прогон через сервер и пакетная сверка.
-# ---------------------------------------------------------------------------
+# work in separate processes: the run through the server and the batch comparison
 def run_server(scenario, min_stations):
-    """Один сценарий через сервер со своей временной базой."""
+    """one scenario through the server with its own temporary database"""
     notes = io.StringIO()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         app = create_app(os.path.join(tmp, "t.db"), min_stations)
@@ -97,7 +95,7 @@ def run_server(scenario, min_stations):
 
 
 def reference(scenario):
-    """Пакетные тревоги (как в step12/13) для сверки с потоком."""
+    """batch alarms (as in step12/13) to compare with the stream"""
     kind, _, arg = scenario.partition(":")
     if kind == "quake":
         origin = UTCDateTime(next(o for o in ORIGINS if o.startswith(arg)))
@@ -123,7 +121,7 @@ def reference(scenario):
     return dict(
         scenario=scenario, starts=starts, neighbors=neighbors,
         majo=[t.timestamp for t in majo_alarms],
-        # правила step13 для каждой тревоги MAJO: R1 (>=1 сосед), R2 (>=2)
+        # step13 rules for every MAJO alarm: R1 (>=1 neighbor), R2 (>=2)
         r1=[judge(stations, t, 1, 10) for t in majo_alarms],
         r2=[judge(stations, t, 2, 10) for t in majo_alarms])
 
@@ -134,15 +132,13 @@ def _task(args):
             reference(scenario) if kind == "ref" else run_server(scenario, n))
 
 
-# ---------------------------------------------------------------------------
-# Подсчёт показателей.
-# ---------------------------------------------------------------------------
+# computing the numbers
 def confirmed_ids(res):
     return {e["id"] for e in res["events"] if e["status"] == "confirmed"}
 
 
 def quake_stats(res, origin_ts):
-    """Показатели одного землетрясения для одного значения N."""
+    """numbers of one earthquake for one value of N"""
     ok_ids = confirmed_ids(res)
     in_win = lambda a: origin_ts <= a["ts"] <= origin_ts + EQ_WINDOW
     events = [e for e in res["events"] if e["id"] in ok_ids
@@ -159,7 +155,7 @@ def quake_stats(res, origin_ts):
 
 
 def hour_stats(res):
-    """Показатели одного тихого часа для одного значения N."""
+    """numbers of one quiet hour for one value of N"""
     ok_ids = confirmed_ids(res)
     events = [e for e in res["events"] if e["id"] in ok_ids]
     no_majo = [e for e in events
@@ -170,7 +166,7 @@ def hour_stats(res):
 
 
 def match_times(batch, stream):
-    """Жадное сопоставление времён (одно к одному, допуск MATCH_TOL)."""
+    """greedy matching of times (one to one, tolerance MATCH_TOL)"""
     free, pairs, only_batch = sorted(stream), [], []
     for b in sorted(batch):
         hit = next((s for s in free if abs(s - b) <= MATCH_TOL), None)
@@ -186,7 +182,6 @@ def stamp(ts):
     return str(UTCDateTime(ts))[:19]
 
 
-# ---------------------------------------------------------------------------
 def main():
     hours = quiet_hours_from_step13(STEP13_FILE)
     table13 = step13_table(STEP13_FILE)
@@ -255,7 +250,7 @@ def main():
           f"= {tot_ev / len(hours):.2f} в час; из них без тревоги MAJO: {tot_no}")
         L()
 
-    # --- Общая таблица ---
+    # summary table
     L("################ СВОДНАЯ ТАБЛИЦА ################")
     L()
     L("А) Метрики сети (как просили): события, а не отдельные тревоги MAJO")
@@ -295,7 +290,7 @@ def main():
       f"проверить правило было нельзя, 'нет данных': {table13['R2']['q_nodata']})")
     L()
 
-    # --- Сверка потока с пакетом ---
+    # stream vs batch comparison
     L("################ СВЕРКА ПОТОКА С ПАКЕТОМ (step12/13) ################")
     L("Тревоги потока (сервер) и пакета (analyze по всей записи) совпадают, "
       f"если разница <= {MATCH_TOL} с. Первые {WARMUP_SEC} с записи поток "
@@ -304,7 +299,7 @@ def main():
     totals = {}
     per_station_notes = []
     for s in scenarios:
-        res = srv[(s, 2)]  # тревоги потока от N не зависят, берём N=2
+        res = srv[(s, 2)]  # alarms of the stream do not depend on N, take N=2
         for key, start in ref[s]["starts"].items():
             batch = ref[s]["majo"] if key == MAJO else ref[s]["neighbors"][key]
             stream = [a["ts"] for a in res["alarms"] if a["station"] == key]
@@ -337,7 +332,7 @@ def main():
         L(line)
     L()
 
-    # --- Расхождения по тревогам MAJO: поток против R1/R2 ---
+    # differences in MAJO alarms: stream vs R1/R2
     L("################ РАСХОЖДЕНИЯ ПО ТРЕВОГАМ MAJO ################")
     L("Для каждой тревоги MAJO пакета: решение step13 (R1 для N=2, R2 для N=3) "
       "против решения сервера (тревога MAJO внутри подтверждённого события).")

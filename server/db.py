@@ -1,4 +1,4 @@
-"""База данных (SQLite): станции, куски записей, тревоги и события сети."""
+"""database (SQLite): stations, record chunks, alarms and network events"""
 
 import sqlite3
 import threading
@@ -24,15 +24,15 @@ CREATE INDEX IF NOT EXISTS alarms_time ON alarms (time_ts);
 
 
 class Database:
-    """Тонкая обёртка над sqlite3. Все времена хранятся как UNIX-секунды (UTC)."""
+    """thin wrapper around sqlite3. All times are stored as UNIX seconds (UTC)"""
 
     def __init__(self, path):
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
-        self.lock = threading.RLock()  # один писатель за раз
+        self.lock = threading.RLock()  # one writer at a time
 
-    # --- станции ---
+    # stations
     def add_station(self, code, name, lat, lon):
         self.conn.execute(
             "INSERT OR REPLACE INTO stations VALUES (?, ?, ?, ?)",
@@ -42,16 +42,16 @@ class Database:
         return [dict(r) for r in self.conn.execute(
             "SELECT * FROM stations ORDER BY code")]
 
-    # --- записи ---
+    # records
     def add_chunk(self, station, start_ts, fs, samples):
-        # float32 + zlib: в несколько раз компактнее, чем текст
+        # float32 + zlib: several times smaller than text
         blob = zlib.compress(np.asarray(samples, dtype=np.float32).tobytes())
         self.conn.execute(
             "INSERT INTO chunks (station, start_ts, sampling_rate, npts, data)"
             " VALUES (?, ?, ?, ?, ?)", (station, start_ts, fs, len(samples), blob))
 
     def waveform(self, station, t0, t1, max_points=2000):
-        """Отсчёты станции между t0 и t1: (времена, значения), не более max_points."""
+        """samples of a station between t0 and t1: (times, values), at most max_points"""
         rows = self.conn.execute(
             "SELECT * FROM chunks WHERE station = ? AND start_ts <= ?"
             " AND start_ts + npts / sampling_rate >= ? ORDER BY start_ts",
@@ -69,7 +69,7 @@ class Database:
         step = max(1, len(times) // max_points)
         return times[::step].tolist(), values[::step].tolist()
 
-    # --- тревоги и события ---
+    # alarms and events
     def add_alarm(self, station, time_ts, peak):
         cur = self.conn.execute(
             "INSERT INTO alarms (station, time_ts, peak) VALUES (?, ?, ?)",
@@ -77,7 +77,7 @@ class Database:
         return cur.lastrowid
 
     def alarms_near(self, t0, t1, exclude_station):
-        """Тревоги ДРУГИХ станций в интервале [t0, t1]."""
+        """alarms of OTHER stations in the interval [t0, t1]"""
         return [dict(r) for r in self.conn.execute(
             "SELECT * FROM alarms WHERE time_ts BETWEEN ? AND ?"
             " AND station != ?", (t0, t1, exclude_station))]
@@ -104,14 +104,14 @@ class Database:
             [event_id, *alarm_ids])
 
     def merge_events(self, old_ids, target_id):
-        """Переносит тревоги старых событий в target и удаляет старые события."""
+        """moves the alarms of old events to target and deletes the old events"""
         for old in old_ids:
             self.conn.execute("UPDATE alarms SET event_id = ? WHERE event_id = ?",
                               (target_id, old))
             self.conn.execute("DELETE FROM events WHERE id = ?", (old,))
 
     def refresh_event(self, event_id, min_stations):
-        """Пересчитывает событие по его тревогам."""
+        """recalculates an event from its alarms"""
         row = self.conn.execute(
             "SELECT MIN(time_ts), MAX(time_ts), COUNT(DISTINCT station)"
             " FROM alarms WHERE event_id = ?", (event_id,)).fetchone()

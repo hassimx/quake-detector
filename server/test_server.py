@@ -1,7 +1,7 @@
-"""Проверки бэкенда. Запуск из корня: .venv/bin/python -m pytest server -q
+"""backend checks. Run from the root: .venv/bin/python -m pytest server -q
 
-Тесты на реальных записях пропускаются, если нет файлов data/ (их создаёт
-step13.py).
+Tests on real records are skipped if there are no data/ files (step13.py
+creates them).
 """
 
 import os
@@ -26,7 +26,7 @@ needs_data = pytest.mark.skipif(
 
 @pytest.fixture(params=[2, 3])
 def client(request, tmp_path):
-    """Сервер с порогом подтверждения 2 и 3 станции (тесты идут для обоих)."""
+    """server with a confirmation threshold of 2 and 3 stations (tests run for both)"""
     app = create_app(str(tmp_path / "t.db"), min_stations=request.param)
     c = TestClient(app)
     c.min_stations = request.param
@@ -62,7 +62,7 @@ def test_min_stations_from_environment(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("need", [2, 3])
 def test_rule_needs_enough_stations(tmp_path, need):
-    """Две станции подтверждают событие только при пороге 2, три при пороге 3."""
+    """two stations confirm an event only with threshold 2, three with threshold 3"""
     db = Database(str(tmp_path / "r.db"))
     t = 1_000_000.0
     status = []
@@ -70,7 +70,7 @@ def test_rule_needs_enough_stations(tmp_path, need):
         alarm = db.add_alarm(station, t + 20 * i, 10.0)
         event = link_alarm(db, alarm, station, t + 20 * i, need)
         status.append(db.events()[0]["status"] if event else None)
-    # после 1-й тревоги события нет, после 2-й и 3-й смотрим статус
+    # after the 1st alarm there is no event, after the 2nd and 3rd we check the status
     assert status[0] is None
     assert status[1] == ("confirmed" if need == 2 else "candidate")
     assert status[2] == "confirmed"
@@ -78,7 +78,7 @@ def test_rule_needs_enough_stations(tmp_path, need):
 
 @needs_data
 def test_stream_matches_batch():
-    """Потоковый детектор находит те же тревоги, что пакетный (step11)."""
+    """the streaming detector finds the same alarms as the batch one (step11)"""
     tr = read(cache_path("IU.MAJO", HOUR_TAG))[0]
     _, _, batch = analyze(tr)
     det, stream = StreamDetector(), []
@@ -88,7 +88,7 @@ def test_stream_matches_batch():
                            tr.stats.sampling_rate, tr.data[i:i + size])
     assert len(stream) == len(batch)
     for s, b in zip(stream, batch):
-        assert abs(s["time"] - b) < 3  # секунд
+        assert abs(s["time"] - b) < 3  # seconds
 
 
 @needs_data
@@ -106,7 +106,7 @@ def test_quake_is_confirmed_and_db_filled(client):
 
 
 def test_index_page(client):
-    """Корень сервера отдаёт веб-страницу, которая ходит в нужные API."""
+    """the server root returns the web page, which calls the right APIs"""
     r = client.get("/")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/html")
@@ -117,7 +117,7 @@ def test_index_page(client):
 
 @needs_data
 def test_page_data_after_replay(client):
-    """После replay есть всё, что рисует страница: станции, события, сигнал."""
+    """after replay everything the page draws is there: stations, events, signal"""
     replay.run("quake:2021-10-07", client, verbose=False)
     assert client.get("/").status_code == 200
     stations = client.get("/api/stations").json()

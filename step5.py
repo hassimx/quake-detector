@@ -1,4 +1,4 @@
-"""Шаг 5: проверяем детектор на нескольких землетрясениях."""
+"""step 5: check the detector on several earthquakes"""
 
 import os
 
@@ -6,13 +6,13 @@ from obspy import read, UTCDateTime
 from obspy.clients.fdsn import Client
 from obspy.signal.trigger import classic_sta_lta, trigger_onset
 
-# Настройки, которые выбрали на шаге 4.
+# settings chosen in step 4
 ON_THR, OFF_THR = 7, 3.5
 STA_SEC, LTA_SEC = 1, 30
-COOLDOWN = 600  # после тревоги молчим 10 минут
+COOLDOWN = 600  # after an alarm we stay silent for 10 minutes
 
-# start = с какого времени берём запись (за 15 минут до землетрясения)
-# origin = когда на самом деле случилось землетрясение (UTC)
+# start = the time from which we take the record (15 minutes before the earthquake)
+# origin = when the earthquake really happened (UTC)
 EVENTS = [
     {"name": "tohoku_2011", "start": "2011-03-11T05:30:00",
      "origin": "2011-03-11T05:46:24"},
@@ -26,7 +26,7 @@ client = Client("EARTHSCOPE")
 
 
 def get_trace(name, start):
-    """Берём запись из файла, а если файла нет, скачиваем из интернета."""
+    """take the record from a file, and if there is no file, download it from the internet"""
     path = f"{name}.mseed"
     if not os.path.exists(path):
         t0 = UTCDateTime(start)
@@ -41,7 +41,7 @@ def get_trace(name, start):
 
 
 def detect(tr):
-    """Возвращает список времён тревог."""
+    """returns the list of alarm times"""
     tr.detrend("demean")
     tr.filter("bandpass", freqmin=1.0, freqmax=8.0)
     fs = tr.stats.sampling_rate

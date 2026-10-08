@@ -1,13 +1,13 @@
-"""Воспроизведение записанных файлов, как будто станции шлют данные онлайн.
+"""replay of recorded files as if the stations were sending data online.
 
-Примеры (из корня проекта, сервер уже запущен):
+Examples (from the project root, the server is already running):
     .venv/bin/python -m server.replay quake:2021-10-07 --speed 60
     .venv/bin/python -m server.replay hour:2016-06-11T17 --speed 0
-Сценарии:
-    quake:ГГГГ-ММ-ДД      окно -15..+10 минут вокруг очага из step12/13
-    hour:ГГГГ-ММ-ДДTЧЧ    тихий час из step13
-Записи берутся из data/ (их скачал step13.py) и ev_*.mseed (MAJO, как в
-step12). --speed N: во сколько раз быстрее реального времени (0 = без пауз).
+Scenarios:
+    quake:YYYY-MM-DD      window -15..+10 minutes around the origin from step12/13
+    hour:YYYY-MM-DDTHH    quiet hour from step13
+The records come from data/ (downloaded by step13.py) and ev_*.mseed (MAJO, as
+in step12). --speed N: how many times faster than real time (0 = no pauses).
 """
 
 import argparse
@@ -24,7 +24,7 @@ MAJO = "IU.MAJO"
 
 
 def load_scenario(name):
-    """Возвращает {код станции: трасса} для сценария."""
+    """returns {station code: trace} for the scenario"""
     kind, _, arg = name.partition(":")
     traces = {}
     if kind == "quake":
@@ -54,7 +54,7 @@ def load_scenario(name):
 
 
 def make_chunks(traces, chunk_sec):
-    """Режет записи на куски и сортирует по времени конца куска."""
+    """cuts the records into chunks and sorts them by the time of the end of the chunk"""
     chunks = []
     for code, tr in traces.items():
         fs = tr.stats.sampling_rate
@@ -70,9 +70,9 @@ def make_chunks(traces, chunk_sec):
 
 
 def run(scenario, client, chunk_sec=10, speed=0, verbose=True):
-    """Шлёт куски на сервер через client (httpx.Client или TestClient).
+    """sends the chunks to the server through client (httpx.Client or TestClient).
 
-    Возвращает список тревог, которые сообщил сервер.
+    Returns the list of alarms that the server reported.
     """
     chunks = make_chunks(load_scenario(scenario), chunk_sec)
     alarms, prev = [], None

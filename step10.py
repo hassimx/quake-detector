@@ -1,13 +1,13 @@
-"""Шаг 10: ищем возможные причины "ложных" тревог в каталоге USGS.
+"""step 10: look for possible causes of the "false" alarms in the USGS catalog.
 
-Идея: детектор сработал в тихие часы. Смотрим, не было ли в это время
-настоящего землетрясения, которое датчик мог поймать:
-  а) рядом с Японией (слабое, но близкое);
-  б) где угодно в мире, но сильное (M 5.5+): такие волны доходят
-     через всю Землю.
+Idea: the detector fired in quiet hours. We check whether there was a real
+earthquake at that time that the sensor could have caught:
+  a) near Japan (weak, but close);
+  b) anywhere in the world, but strong (M 5.5+): such waves travel
+     through the whole Earth.
 
-Алгоритм детектора здесь НЕ трогаем: скрипт только читает каталог.
-Весь вывод печатается на экран и сохраняется в results/step10_output.txt.
+We do NOT touch the detector algorithm here: the script only reads the catalog.
+All output is printed to the screen and saved to results/step10_output.txt.
 """
 
 import os
@@ -16,7 +16,7 @@ from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
 from obspy.clients.fdsn.header import FDSNNoDataException
 
-# Времена тревог (UTC), которые мы проверяем.
+# alarm times (UTC) that we check
 ALARMS = [
     "2019-09-20T10:48:45",
     "2019-09-20T10:50:00",
@@ -24,22 +24,22 @@ ALARMS = [
     "2018-03-12T02:45:07",
 ]
 
-# Рамка "рядом с Японией" (градусы) и минимальная магнитуда.
+# the "near Japan" box (degrees) and the minimum magnitude
 JAPAN_BOX = dict(minlatitude=30, maxlatitude=45,
                  minlongitude=130, maxlongitude=146)
 JAPAN_MIN_MAG = 2.0
-JAPAN_BEFORE = 300   # секунд до тревоги
-JAPAN_AFTER = 30     # секунд после тревоги
+JAPAN_BEFORE = 300   # seconds before the alarm
+JAPAN_AFTER = 30     # seconds after the alarm
 
-# Сильные землетрясения по всему миру.
+# strong earthquakes all over the world
 WORLD_MIN_MAG = 5.5
-WORLD_BEFORE = 30 * 60  # 30 минут до тревоги
+WORLD_BEFORE = 30 * 60  # 30 minutes before the alarm
 
 OUTPUT_FILE = os.path.join("results", "step10_output.txt")
 
 
 class Report:
-    """Печатает строку на экран и одновременно пишет её в файл."""
+    """prints a line to the screen and writes it to the file at the same time"""
 
     def __init__(self, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -48,18 +48,18 @@ class Report:
     def line(self, text=""):
         print(text)
         self.file.write(text + "\n")
-        self.file.flush()  # чтобы при сбое уже напечатанное сохранилось
+        self.file.flush()  # so that what was already printed is saved after a crash
 
     def close(self):
         self.file.close()
 
 
 def find_events(client, **kwargs):
-    """Запрашивает каталог. Возвращает (список событий, текст ошибки).
+    """queries the catalog. Returns (list of events, error text).
 
-    Если каталог честно отвечает "ничего нет" — это пустой список и
-    ошибки нет. Если запрос сломался (например, нет интернета) — это
-    ошибка: её нельзя путать с "ничего не найдено".
+    If the catalog honestly answers "nothing" it is an empty list and
+    no error. If the request broke (for example, no internet) it is an
+    error: it must not be confused with "nothing found".
     """
     try:
         catalog = client.get_events(orderby="time", **kwargs)
@@ -71,7 +71,7 @@ def find_events(client, **kwargs):
 
 
 def describe(event):
-    """Время, магнитуда и место события одной строкой."""
+    """time, magnitude and place of an event in one line"""
     origin = event.preferred_origin() or event.origins[0]
     magnitude = event.preferred_magnitude() or (
         event.magnitudes[0] if event.magnitudes else None)
@@ -85,7 +85,7 @@ def describe(event):
 
 
 def show(report, title, events, error):
-    """Печатает результат одного запроса."""
+    """prints the result of one query"""
     report.line(f"  {title}")
     if error:
         report.line(f"    ОШИБКА ЗАПРОСА (это не 'ничего нет'): {error}")
@@ -105,7 +105,7 @@ def main():
         alarm = UTCDateTime(alarm_text)
         report.line(f"=== Тревога {alarm} ===")
 
-        # а) рядом с Японией, слабые тоже: от -300 с до +30 с
+        # a) near Japan, weak ones too: from -300 s to +30 s
         events, error = find_events(
             client,
             starttime=alarm - JAPAN_BEFORE,
@@ -117,7 +117,7 @@ def main():
         show(report, f"а) Япония, M {JAPAN_MIN_MAG}+, "
                      f"-{JAPAN_BEFORE} с ... +{JAPAN_AFTER} с:", events, error)
 
-        # б) весь мир, только сильные: за 30 минут до тревоги
+        # b) the whole world, only strong ones: 30 minutes before the alarm
         events, error = find_events(
             client,
             starttime=alarm - WORLD_BEFORE,

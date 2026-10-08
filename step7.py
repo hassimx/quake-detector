@@ -1,4 +1,4 @@
-"""Шаг 7: проверка на 10 землетрясениях и тихих часах."""
+"""step 7: check on 10 earthquakes and quiet hours"""
 
 import os
 import statistics
@@ -10,10 +10,10 @@ from obspy.signal.trigger import classic_sta_lta, trigger_onset
 
 ON_THR, OFF_THR = 7, 3.5
 STA_SEC, LTA_SEC = 1, 30
-DETECT_WINDOW = 120  # "замечено", если тревога в течение 2 минут после очага
-GROUP_SEC = 60       # тревоги ближе 60 сек считаем одной
+DETECT_WINDOW = 120  # "detected" if there is an alarm within 2 minutes after the origin
+GROUP_SEC = 60       # alarms closer than 60 s count as one
 
-# Время очага (UTC) из каталога USGS.
+# origin time (UTC) from the USGS catalog
 ORIGINS = [
     "2011-03-11T05:46:24",
     "2021-10-07T13:41:24",
@@ -27,7 +27,7 @@ ORIGINS = [
     "2021-08-03T20:33:34",
 ]
 
-# Часы, которые мы хотим проверить как "тихие" (программа сама проверит).
+# hours we want to check as "quiet" (the program checks them itself)
 QUIET_CANDIDATES = [
     "2019-08-15T04:00:00",
     "2019-09-20T10:00:00",
@@ -39,7 +39,7 @@ catalog = Client("USGS")
 
 
 def get_trace(name, start):
-    """Берём запись из файла, а если файла нет, скачиваем. Нет данных -> None."""
+    """take the record from a file, and if there is none, download it. No data -> None"""
     path = f"{name}.mseed"
     try:
         if not os.path.exists(path):
@@ -59,7 +59,7 @@ def get_trace(name, start):
 
 
 def detect(tr):
-    """Список времён тревог (близкие тревоги склеены в одну)."""
+    """list of alarm times (close alarms are merged into one)"""
     tr.detrend("demean")
     tr.filter("bandpass", freqmin=1.0, freqmax=8.0)
     fs = tr.stats.sampling_rate
@@ -73,14 +73,14 @@ def detect(tr):
 
 
 def is_quiet(t0):
-    """True, если рядом нет землетрясений M4+ (по каталогу USGS)."""
+    """True if there are no M4+ earthquakes nearby (by the USGS catalog)"""
     try:
         catalog.get_events(
             starttime=t0 - 600, endtime=t0 + 3600 + 600, minmagnitude=4.0,
             minlatitude=30, maxlatitude=45, minlongitude=130, maxlongitude=146)
-        return False  # события нашлись
+        return False  # events were found
     except FDSNNoDataException:
-        return True   # каталог ответил "ничего нет"
+        return True   # the catalog answered "nothing"
 
 
 print("=== Землетрясения ===")

@@ -1,8 +1,8 @@
-"""Вспомогательное для run_demo.bat: ждём сервер или проверяем, что порт свободен.
+"""helper for run_demo.bat: waits for the server or checks that the port is free.
 
-    .venv\\Scripts\\python -m server.wait_server 90      ждать ответа сервера до 90 с
-    .venv\\Scripts\\python -m server.wait_server --free  убедиться, что сервера ещё нет
-Код возврата: 0 - всё в порядке, 1 - нет (сообщение по-русски уже напечатано).
+    .venv\\Scripts\\python -m server.wait_server 90      wait for the server to answer, up to 90 s
+    .venv\\Scripts\\python -m server.wait_server --free  make sure there is no server yet
+Exit code: 0 - all fine, 1 - not (the message in Russian has already been printed).
 """
 
 import sys
@@ -13,7 +13,7 @@ URL = "http://127.0.0.1:8000/api/config"
 
 
 def answers():
-    """True, если по адресу сервера кто-то отвечает."""
+    """True if something answers at the server address"""
     try:
         urllib.request.urlopen(URL, timeout=2)
         return True

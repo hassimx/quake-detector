@@ -1,24 +1,24 @@
-"""Шаг 11: видят ли тревоги MAJO соседние станции?
+"""step 11: do the neighbor stations see the MAJO alarms?
 
-Идея: настоящее землетрясение записывают сразу несколько близких станций,
-а местная помеха (ветер, сбой датчика) обычно видна только на одной.
-Поэтому для каждой тревоги на IU.MAJO мы:
-  1) находим соседние сейсмические станции в рамке вокруг Японии;
-  2) скачиваем 5 минут записи (от -2 до +3 минут) с 3 ближайших;
-  3) гоняем через ТАКОЙ ЖЕ детектор, как для MAJO;
-  4) смотрим, сработали ли они в пределах +-60 сек от тревоги на MAJO.
+Idea: a real earthquake is recorded by several close stations at once,
+while a local disturbance (wind, a sensor glitch) is usually seen on one only.
+So for every alarm on IU.MAJO we:
+  1) find the neighbor seismic stations in a box around Japan;
+  2) download 5 minutes of record (from -2 to +3 minutes) from the 3 closest;
+  3) run them through the SAME detector as for MAJO;
+  4) check whether they fired within +-60 s of the MAJO alarm.
 
-Детектор здесь НЕ меняется: параметры и обработка скопированы из step.7.py
-(он выполняется целиком при импорте и называется с точкой, поэтому
-импортировать его нельзя). Весь вывод сохраняется в results/step11_output.txt,
-картинки лежат рядом, в results/.
+The detector is NOT changed here: the parameters and processing are copied from
+step.7.py (it runs completely on import and has a dot in its name, so it cannot
+be imported). All output is saved to results/step11_output.txt, the pictures
+are next to it, in results/.
 """
 
 import os
 
 import matplotlib
 
-matplotlib.use("Agg")  # рисуем в файлы, без окна
+matplotlib.use("Agg")  # draw to files, without a window
 import matplotlib.pyplot as plt
 
 from obspy import UTCDateTime
@@ -27,25 +27,21 @@ from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.geodetics import gps2dist_azimuth
 from obspy.signal.trigger import classic_sta_lta, trigger_onset
 
-# ---------------------------------------------------------------------------
-# Параметры детектора (как в step.7.py / step8.py; порог 10 по условию задачи).
-# ---------------------------------------------------------------------------
-ON_THR = 10              # порог включения STA/LTA
-OFF_THR = ON_THR / 2     # порог выключения (как в step7/step8: порог / 2)
-STA_SEC, LTA_SEC = 1, 30  # короткое и длинное окна, секунды
-FREQ_MIN, FREQ_MAX = 1.0, 8.0  # полосовой фильтр, Гц
-GROUP_SEC = 60           # тревоги ближе 60 сек считаем одной
+# detector parameters (as in step.7.py / step8.py; threshold 10 as the task says)
+ON_THR = 10              # STA/LTA switch-on threshold
+OFF_THR = ON_THR / 2     # switch-off threshold (as in step7/step8: threshold / 2)
+STA_SEC, LTA_SEC = 1, 30  # short and long windows, seconds
+FREQ_MIN, FREQ_MAX = 1.0, 8.0  # band-pass filter, Hz
+GROUP_SEC = 60           # alarms closer than 60 s count as one
 
-# ---------------------------------------------------------------------------
-# Что ищем.
-# ---------------------------------------------------------------------------
+# what we are looking for
 BOX = dict(minlatitude=30, maxlatitude=45, minlongitude=130, maxlongitude=146)
-DATES = ["2019-09-20", "2018-03-12"]  # станция должна работать в обе даты
-CHANNELS = ("BHZ", "HHZ")             # вертикальная компонента
+DATES = ["2019-09-20", "2018-03-12"]  # the station must work on both dates
+CHANNELS = ("BHZ", "HHZ")             # vertical component
 MAJO = "IU.MAJO"
-N_NEIGHBORS = 6                       # сколько ближайших станций берём
-# (было 3, но IM.MJAR, в 0.6 км от MAJO, не имеет записей за эти даты,
-# поэтому берём больше, чтобы осталось с чем сравнивать)
+N_NEIGHBORS = 6                       # how many nearest stations we take
+# (was 3, but IM.MJAR, 0.6 km from MAJO, has no records for these dates,
+# so we take more to have something left to compare with)
 
 ALARMS = [
     "2019-09-20T10:48:45",
@@ -53,15 +49,15 @@ ALARMS = [
     "2019-09-20T10:54:09",
     "2018-03-12T02:45:07",
 ]
-BEFORE, AFTER = 120, 180   # запись: от -2 до +3 минут вокруг тревоги
-MATCH_SEC = 60             # "сработала рядом", если тревога в пределах +-60 сек
+BEFORE, AFTER = 120, 180   # record: from -2 to +3 minutes around the alarm
+MATCH_SEC = 60             # "fired nearby" if the alarm is within +-60 s
 
 RESULTS_DIR = "results"
 OUTPUT_FILE = os.path.join(RESULTS_DIR, "step11_output.txt")
 
 
 class Report:
-    """Печатает строку на экран и одновременно пишет её в файл."""
+    """prints a line to the screen and writes it to the file at the same time"""
 
     def __init__(self, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -70,20 +66,18 @@ class Report:
     def line(self, text=""):
         print(text)
         self.file.write(text + "\n")
-        self.file.flush()  # чтобы при сбое уже напечатанное сохранилось
+        self.file.flush()  # so that what was already printed is saved after a crash
 
     def close(self):
         self.file.close()
 
 
-# ---------------------------------------------------------------------------
-# Часть 1: поиск станций.
-# ---------------------------------------------------------------------------
+# part 1: finding stations
 def stations_on_date(client, date):
-    """Станции с BHZ/HHZ в рамке, работавшие в этот день.
+    """stations with BHZ/HHZ in the box that worked on this day.
 
-    Возвращает словарь {"сеть.станция": {lat, lon, channels}}.
-    Если каталог отвечает "ничего нет" — пустой словарь.
+    Returns a dict {"network.station": {lat, lon, channels}}.
+    If the catalog answers "nothing", an empty dict.
     """
     start = UTCDateTime(date)
     try:
@@ -103,7 +97,7 @@ def stations_on_date(client, date):
 
 
 def find_stations(client):
-    """Станции, активные во ВСЕ нужные даты (пересечение по датам)."""
+    """stations active on ALL required dates (intersection over dates)"""
     per_date = [stations_on_date(client, d) for d in DATES]
     common = {}
     for key, info in per_date[0].items():
@@ -118,7 +112,7 @@ def find_stations(client):
 
 
 def majo_position(client, stations):
-    """Координаты MAJO: из найденных станций или отдельным запросом."""
+    """coordinates of MAJO: from the found stations or by a separate query"""
     if MAJO in stations:
         return stations[MAJO]["lat"], stations[MAJO]["lon"]
     net, sta = MAJO.split(".")
@@ -127,34 +121,32 @@ def majo_position(client, stations):
 
 
 def distance_km(lat1, lon1, lat2, lon2):
-    """Расстояние по поверхности Земли, км."""
+    """distance over the Earth's surface, km"""
     return gps2dist_azimuth(lat1, lon1, lat2, lon2)[0] / 1000
 
 
 def pick_channel(channels):
-    """BHZ предпочитаем (как у MAJO), иначе HHZ."""
+    """we prefer BHZ (like MAJO), otherwise HHZ"""
     return "BHZ" if "BHZ" in channels else channels[0]
 
 
-# ---------------------------------------------------------------------------
-# Часть 2: скачивание и детектор.
-# ---------------------------------------------------------------------------
+# part 2: download and detector
 def fetch_trace(client, key, channel, start, end):
-    """Скачивает запись станции. Возвращает (трасса, None) или (None, причина).
+    """downloads a station record. Returns (trace, None) or (None, reason).
 
-    "Нет данных" и "сломался запрос" — разные причины, их нельзя путать.
+    "No data" and "the request broke" are different reasons, they must not be confused.
     """
     net, sta = key.split(".")
     try:
-        # Как в step2/step7: сначала location "00", если нет — любой ("*").
-        # Иначе у MAJO выбралась бы другая запись (10.BHZ, 40 Гц), а не та,
-        # на которой делался детектор (00.BHZ, 20 Гц).
+        # as in step2/step7: location "00" first, and if there is none, any ("*")
+        # Otherwise MAJO would get another record (10.BHZ, 40 Hz), not the one
+        # the detector was built on (00.BHZ, 20 Hz)
         try:
             st = client.get_waveforms(net, sta, "00", channel, start, end)
         except FDSNNoDataException:
             st = client.get_waveforms(net, sta, "*", channel, start, end)
-        st.merge(fill_value=0)              # как в step7: дыры заполняем нулями
-        tr = max(st, key=lambda t: t.stats.npts)  # самая длинная трасса
+        st.merge(fill_value=0)              # as in step7: fill gaps with zeros
+        tr = max(st, key=lambda t: t.stats.npts)  # the longest trace
     except FDSNNoDataException:
         return None, "нет данных"
     except Exception as err:
@@ -165,10 +157,10 @@ def fetch_trace(client, key, channel, start, end):
 
 
 def analyze(tr):
-    """Тот же детектор, что в step.7.py (функция detect).
+    """the same detector as in step.7.py (the detect function).
 
-    Отличие только одно: возвращаем ещё и сигнал после фильтра с кривой
-    STA/LTA (для графиков и пиков), а исходную трассу не портим.
+    There is only one difference: we also return the filtered signal with the
+    STA/LTA curve (for the plots and peaks), and do not spoil the source trace.
     """
     tr = tr.copy()
     tr.detrend("demean")
@@ -183,11 +175,9 @@ def analyze(tr):
     return tr, ratio, alarms
 
 
-# ---------------------------------------------------------------------------
-# Часть 3: сравнение с тревогой на MAJO.
-# ---------------------------------------------------------------------------
+# part 3: comparison with the alarm on MAJO
 def peak_near(tr, ratio, alarm):
-    """Максимум STA/LTA в окне +-60 сек вокруг тревоги (None, если окна нет)."""
+    """STA/LTA maximum in the +-60 s window around the alarm (None if there is no window)"""
     fs = tr.stats.sampling_rate
     i0 = int((alarm - MATCH_SEC - tr.stats.starttime) * fs)
     i1 = int((alarm + MATCH_SEC - tr.stats.starttime) * fs)
@@ -198,7 +188,7 @@ def peak_near(tr, ratio, alarm):
 
 
 def compare(tr, ratio, alarms, alarm):
-    """Результат для одной станции: сработала ли в пределах +-60 сек."""
+    """result for one station: did it fire within +-60 s"""
     near = [t for t in alarms if abs(t - alarm) <= MATCH_SEC]
     return dict(
         hit=bool(near),
@@ -209,17 +199,17 @@ def compare(tr, ratio, alarms, alarm):
 
 
 def plot_alarm(path, alarm, rows):
-    """Сигналы всех станций друг под другом (после фильтра 1-8 Гц)."""
+    """signals of all stations one under another (after the 1-8 Hz filter)"""
     fig, axes = plt.subplots(len(rows), 1, figsize=(10, 2.2 * len(rows)),
                              sharex=True, squeeze=False)
     for ax, row in zip(axes[:, 0], rows):
         if row["tr"] is None:
             ax.text(0.5, 0.5, f'{row["key"]}: {row["note"]}',
                     ha="center", va="center", transform=ax.transAxes)
-            ax.set_yticks([])  # шкала на пустом графике ни к чему
+            ax.set_yticks([])  # a scale on an empty plot is pointless
         else:
             tr = row["tr"]
-            t = tr.times() + (tr.stats.starttime - alarm)  # сек от тревоги MAJO
+            t = tr.times() + (tr.stats.starttime - alarm)  # seconds from the MAJO alarm
             ax.plot(t, tr.data, linewidth=0.5)
             for a in row["alarms"]:
                 ax.axvline(a - alarm, color="orange", linestyle="--",
@@ -246,7 +236,7 @@ def main():
                 f"склейка тревог {GROUP_SEC} с")
     report.line()
 
-    # --- 1. Станции ---
+    # 1. stations
     report.line("=== Станции (BHZ/HHZ, рамка 30-45 с.ш., 130-146 в.д., "
                 f"активны {' и '.join(DATES)}) ===")
     try:
@@ -279,14 +269,14 @@ def main():
                 + ", ".join(f"{k} ({v['dist']:.0f} км)" for k, v in neighbors))
     report.line()
 
-    # MAJO скачиваем так же, как соседей: для сравнения на одной картинке.
+    # we download MAJO the same way as the neighbors: to compare on one picture
     majo_channel = pick_channel(stations[MAJO]["channels"]) \
         if MAJO in stations else "BHZ"
     targets = [(MAJO, majo_channel)] + [
         (k, pick_channel(v["channels"])) for k, v in neighbors]
 
-    # --- 2-3. Тревоги ---
-    summary = []  # (тревога, {станция: короткий статус})
+    # 2-3. alarms
+    summary = []  # (alarm, {station: short status})
     for number, alarm_text in enumerate(ALARMS, start=1):
         alarm = UTCDateTime(alarm_text)
         report.line(f"=== Тревога {number}: {alarm} ===")
@@ -316,8 +306,8 @@ def main():
                 report.line(f"{head}: не сработала, пик STA/LTA в окне "
                             f"+-{MATCH_SEC} с = {peak} (порог {ON_THR})")
                 status[key] = "нет"
-            # Все срабатывания станции в 5-минутной записи (сек от тревоги
-            # MAJO), в том числе вне окна +-60 с: так видно, почему "нет".
+            # all firings of the station in the 5-minute record (seconds from the MAJO
+            # alarm), including outside the +-60 s window: this shows why it says "no"
             own = ", ".join(f"{round(a - alarm):+d}" for a in alarms) or "нет"
             report.line(f"      все срабатывания станции в записи, сек от "
                         f"тревоги MAJO: {own}")
@@ -330,7 +320,7 @@ def main():
         report.line()
         summary.append((alarm, status))
 
-    # --- Итоговая таблица ---
+    # summary table
     report.line("=== Сводка: сработала ли станция в пределах "
                 f"+-{MATCH_SEC} с ===")
     names = [k for k, _ in targets]

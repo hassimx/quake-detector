@@ -1,4 +1,4 @@
-"""Шаг 4: перебираем настройки STA/LTA и смотрим, какие лучше."""
+"""step 4: try different STA/LTA settings and see which are better"""
 
 from obspy import read, UTCDateTime
 from obspy.signal.trigger import classic_sta_lta, trigger_onset
@@ -10,17 +10,17 @@ tr.detrend("demean")
 tr.filter("bandpass", freqmin=1.0, freqmax=8.0)
 fs = tr.stats.sampling_rate
 
-# Начало землетрясения (время в очаге). До него тревоги считаем ложными.
+# start of the earthquake (origin time). Alarms before it count as false
 ORIGIN = UTCDateTime("2011-03-11T05:46:24")
-COOLDOWN = 600  # после тревоги молчим 10 минут (секунды)
+COOLDOWN = 600  # after an alarm we stay silent for 10 minutes (seconds)
 
 
 def run(on_thr, off_thr, sta_sec, lta_sec):
     ratio = classic_sta_lta(tr.data, int(sta_sec * fs), int(lta_sec * fs))
     triggers = trigger_onset(ratio, on_thr, off_thr)
 
-    # Убираем повторные тревоги: оставляем только те, что идут
-    # не раньше чем через COOLDOWN секунд после предыдущей.
+    # remove repeated alarms: keep only those that come
+    # no earlier than COOLDOWN seconds after the previous one
     alarms = []
     for on, off in triggers:
         t = tr.stats.starttime + on / fs

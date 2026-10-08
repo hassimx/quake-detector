@@ -1,4 +1,4 @@
-"""Шаг 9: что за тревоги остаются даже при высоком пороге."""
+"""step 9: what alarms remain even at a high threshold"""
 
 import matplotlib
 
@@ -27,7 +27,7 @@ for name in FILES:
         peak = ratio[on:off + 1].max()
         print(f"  {t}  пик STA/LTA = {peak:.0f}")
 
-        # Рисуем 30 сек до тревоги и 90 сек после.
+        # draw 30 s before the alarm and 90 s after
         a = max(0, int(on - 30 * fs))
         b = min(len(tr.data), int(on + 90 * fs))
         plt.figure(figsize=(10, 3))

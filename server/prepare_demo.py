@@ -1,16 +1,19 @@
-"""Подготовка демо: скачивает записи 4 соседних станций для quake:2021-10-07.
+"""demo preparation: downloads the records of the 4 neighbor stations for quake:2021-10-07.
 
-Запуск (из корня проекта; его же вызывает run_demo.bat):
+Run (from the project root; run_demo.bat calls it too):
     .venv\\Scripts\\python -m server.prepare_demo
 
-Что делает:
-  * берёт окно от -15 до +10 минут вокруг очага 2021-10-07T13:41:24 (как step12/13);
-  * кладёт записи JP.JGF, JP.JSD, G.INU, PS.TSK в data/ под теми именами, которые
-    ждёт server/replay.py (их же использует step13);
-  * запись MAJO уже лежит в репозитории (ev_2021-10-07.mseed), её не качаем;
-  * если все файлы уже есть, ничего не скачивает;
-  * при ошибке (например, нет интернета) пишет понятное сообщение, без traceback.
-Код возврата: 0 - всё готово, 1 - демо запустить нельзя.
+What it does:
+  * takes the window from -15 to +10 minutes around the origin
+    2021-10-07T13:41:24 (as in step12/13);
+  * puts the records of JP.JGF, JP.JSD, G.INU, PS.TSK into data/ under the names
+    that server/replay.py expects (step13 uses the same ones);
+  * the MAJO record is already in the repository (ev_2021-10-07.mseed), so it
+    is not downloaded;
+  * if all files are already there, it downloads nothing;
+  * on an error (for example, no internet) it prints a clear message, without
+    a traceback.
+Exit code: 0 - everything is ready, 1 - the demo cannot be started.
 """
 
 import os
@@ -25,7 +28,7 @@ from step13 import cache_path, load_neighbor
 DATE = "2021-10-07"
 TAG = "quake_" + DATE
 MAJO_FILE = f"ev_{DATE}.mseed"
-MIN_NEIGHBORS = 2  # MAJO + 2 соседа = 3 станции, меньше правило не выполнить
+MIN_NEIGHBORS = 2  # MAJO + 2 neighbors = 3 stations, the rule cannot be met with fewer
 
 
 def main():
@@ -88,6 +91,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nПрервано.")
         sys.exit(1)
-    except Exception as err:  # на всякий случай: никаких traceback для пользователя
+    except Exception as err:  # just in case: no tracebacks for the user
         print(f"Неожиданная ошибка при подготовке демо: {err}")
         sys.exit(1)

@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quake Detector - live network view</title>
-<!-- Leaflet с cdnjs: единственная внешняя библиотека; графики сигналов рисуем сами (SVG) -->
+<!-- Leaflet from cdnjs: the only external library; the signal plots are drawn by hand (SVG) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-  /* Цвета и размеры в одном месте */
+  /* colors and sizes in one place */
   :root {
     --bg: #f4f5f7; --panel: #ffffff; --text: #1f2933; --muted: #6b7785;
     --line: #dde1e6; --accent: #1c7ed6; --fresh: #e8590c; --ok: #2b8a3e;
@@ -156,33 +156,33 @@
 <script>
 "use strict";
 
-// ---------- Настройки ----------
-const REFRESH_MS = 2000;      // как часто опрашиваем сервер
-const FRESH_MS = 30000;       // событие "новое", если страница увидела его < 30 с назад
-const CIRCLE_RADIUS_M = 22000; // радиус круга вокруг станции, увидевшей событие
+// settings
+const REFRESH_MS = 2000;      // how often we poll the server
+const FRESH_MS = 30000;       // an event is "new" if the page saw it < 30 s ago
+const CIRCLE_RADIUS_M = 22000; // radius of the circle around a station that saw the event
 const COLOR_FRESH = "#e8590c", COLOR_OLD = "#1c7ed6";
 const REFERENCE_STATION = "IU.MAJO";
 
-// ---------- Состояние ----------
+// state
 const state = {
-  stations: [],            // из /api/stations
-  events: [],              // подтверждённые события, новые сверху
-  firstSeen: new Map(),    // id события -> когда страница его впервые увидела (мс)
-  selected: null,          // id выбранного события
-  signature: "",           // отпечаток списка событий: перерисовываем, только если он изменился
+  stations: [],            // from /api/stations
+  events: [],              // confirmed events, newest on top
+  firstSeen: new Map(),    // event id -> when the page first saw it (ms)
+  selected: null,          // id of the selected event
+  signature: "",           // fingerprint of the event list: we redraw only if it changed
   firstTick: true,
-  waveToken: 0,            // чтобы поздний ответ не затирал более новый выбор
+  waveToken: 0,            // so a late answer does not overwrite a newer choice
 };
 const hasMap = typeof L !== "undefined";
 let map = null;
-const eventLayers = new Map(); // id события -> массив кругов на карте
+const eventLayers = new Map(); // event id -> array of circles on the map
 
-// ---------- Вспомогательные ----------
+// helpers
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-// Сервер отдаёт время вида 2021-10-07T13:41:12.345678Z; у Date.parse надёжны только мс.
+// the server returns time like 2021-10-07T13:41:12.345678Z; Date.parse is reliable only to ms
 const toMs = (iso) => Date.parse(iso.replace(/(\.\d{3})\d*/, "$1"));
 const fmtUtc = (ms) => new Date(ms).toISOString().replace("T", " ").slice(0, 19);
 const fmtClock = (ms) => new Date(ms).toISOString().slice(11, 19);
@@ -202,7 +202,7 @@ function setStatus(ok, text) {
 const isFresh = (ev) => Date.now() - (state.firstSeen.get(ev.id) || 0) < FRESH_MS;
 const stationsOf = (ev) => [...new Set(ev.alarms.map((a) => a.station))];
 
-// ---------- Карта ----------
+// map
 function initMap() {
   if (!hasMap) { $("map-msg").style.display = "flex"; return; }
   map = L.map("map", { zoomControl: true }).setView([36.5, 138.3], 6);
@@ -225,7 +225,7 @@ function initMap() {
 
 function stationByCode(code) { return state.stations.find((s) => s.code === code); }
 
-// Круги вокруг станций, которые увидели событие
+// circles around the stations that saw the event
 function drawEventLayers(ev) {
   if (!hasMap) return;
   const layers = [];
@@ -251,7 +251,7 @@ function styleLayers() {
         color: sel ? "#212529" : color, fillColor: color,
         weight: sel ? 3 : 2, fillOpacity: sel ? 0.45 : 0.25,
       });
-      c.setRadius(sel ? CIRCLE_RADIUS_M * 1.4 : CIRCLE_RADIUS_M); // выбранное событие крупнее
+      c.setRadius(sel ? CIRCLE_RADIUS_M * 1.4 : CIRCLE_RADIUS_M); // the selected event is bigger
       if (sel) c.bringToFront();
     }
   }
@@ -264,7 +264,7 @@ function syncMapLayers() {
     if (!ids.has(id)) { layers.forEach((l) => l.remove()); eventLayers.delete(id); }
   }
   for (const ev of state.events) {
-    // событие могло получить новые станции: перерисовываем его круги
+    // the event may have got new stations: redraw its circles
     const have = (eventLayers.get(ev.id) || []).length;
     if (have !== stationsOf(ev).filter(stationByCode).length) {
       (eventLayers.get(ev.id) || []).forEach((l) => l.remove());
@@ -273,7 +273,7 @@ function syncMapLayers() {
   }
 }
 
-// ---------- Список событий ----------
+// event list
 function renderList() {
   const ul = $("events");
   $("count").textContent = state.events.length ? `(${state.events.length})` : "";
@@ -295,7 +295,7 @@ function renderList() {
   });
 }
 
-// Цвета "новое/старое" и выделение обновляем на месте, без перестройки списка
+// the "new/old" colors and the selection are updated in place, without rebuilding the list
 function updateFreshness() {
   document.querySelectorAll("#events li[data-id]").forEach((li) => {
     const ev = state.events.find((e) => e.id === Number(li.dataset.id));
@@ -308,7 +308,7 @@ function updateFreshness() {
   styleLayers();
 }
 
-// ---------- Графики сигналов (SVG, без библиотек) ----------
+// signal plots (SVG, no libraries)
 async function selectEvent(id, pan) {
   const ev = state.events.find((e) => e.id === id);
   if (!ev) return;
@@ -336,9 +336,9 @@ async function loadWaveforms(ev) {
       return { st, times: w.times.map(toMs), values: w.values };
     } catch (e) { return { st, times: [], values: [], error: true }; }
   }));
-  if (token !== state.waveToken) return; // пока грузили, выбрали другое событие
-  // Если записи кончаются раньше окна (например, replay дошёл только досюда),
-  // обрезаем ось времени по последнему отсчёту, чтобы графики не были пустыми справа.
+  if (token !== state.waveToken) return; // another event was selected while loading
+  // if the records end before the window (for example, replay has only got this far),
+  // we cut the time axis at the last sample so the plots are not empty on the right
   const lasts = rows.filter((r) => r.times.length).map((r) => r.times[r.times.length - 1]);
   const plotEnd = lasts.length ? Math.min(end, Math.max(Math.max(...lasts), t1 + 30000)) : end;
   $("wave").innerHTML = drawWaves(ev, rows, start, plotEnd) +
@@ -357,7 +357,7 @@ function drawWaves(ev, rows, start, end) {
   rows.forEach((r, i) => {
     const top = PAD_T + i * ROW, mid = top + ROW / 2;
     svg += `<line x1="${X0}" x2="${X1}" y1="${top + ROW}" y2="${top + ROW}" stroke="#e5e8ec"/>`;
-    // сигнал: вычитаем среднее и нормируем по максимуму в этом окне
+    // signal: subtract the mean and normalize by the maximum in this window
     if (r.values.length > 1) {
       const mean = r.values.reduce((s, v) => s + v, 0) / r.values.length;
       const peak = Math.max(...r.values.map((v) => Math.abs(v - mean))) || 1;
@@ -385,13 +385,13 @@ function drawWaves(ev, rows, start, end) {
   return svg + "</svg>";
 }
 
-// ---------- Обновление раз в 2 секунды ----------
+// update every 2 seconds
 async function tick() {
   try {
     const events = await getJSON("/api/events?status=confirmed&limit=100");
     const now = Date.now();
     for (const ev of events) {
-      // события, которые уже были при открытии страницы, "новыми" не считаем
+      // events that were already there when the page opened do not count as "new"
       if (!state.firstSeen.has(ev.id)) state.firstSeen.set(ev.id, state.firstTick ? 0 : now);
     }
     state.firstTick = false;
@@ -401,14 +401,14 @@ async function tick() {
       state.signature = sig;
       renderList();
       syncMapLayers();
-      // выбранное событие могло получить новые тревоги: обновим его графики
+      // the selected event may have got new alarms: update its plots
       const sel = events.find((e) => e.id === state.selected);
       if (sel) loadWaveforms(sel);
     }
     updateFreshness();
     setStatus(true, "live, updated " + fmtClock(now) + " UTC");
   } catch (e) {
-    console.error("tick failed:", e); // для отладки: причина видна в консоли браузера
+    console.error("tick failed:", e); // for debugging: the reason is visible in the browser console
     setStatus(false, "server unreachable");
   }
 }

@@ -1,4 +1,4 @@
-"""Шаг 8: как порог влияет на пропуски и ложные тревоги."""
+"""step 8: how the threshold affects misses and false alarms"""
 
 import statistics
 
@@ -6,8 +6,8 @@ from obspy import read, UTCDateTime
 from obspy.signal.trigger import classic_sta_lta, trigger_onset
 
 STA_SEC, LTA_SEC = 1, 30
-DETECT_WINDOW = 120  # "замечено", если тревога в течение 2 минут после очага
-GROUP_SEC = 60       # тревоги ближе 60 сек считаем одной
+DETECT_WINDOW = 120  # "detected" if there is an alarm within 2 minutes after the origin
+GROUP_SEC = 60       # alarms closer than 60 s count as one
 
 ORIGINS = [
     "2011-03-11T05:46:24", "2021-10-07T13:41:24", "2016-12-28T12:38:49",
@@ -19,7 +19,7 @@ QUIET_FILES = ["quiet_2019-08-15", "quiet_2019-09-20", "quiet_2018-03-12"]
 
 
 def load(name):
-    """Читаем запись, чистим, сразу считаем STA/LTA."""
+    """read the record, clean it, compute STA/LTA right away"""
     st = read(f"{name}.mseed")
     st.merge(fill_value=0)
     tr = st[0]
@@ -31,7 +31,7 @@ def load(name):
 
 
 def alarms(tr, ratio, on_thr):
-    """Времена тревог при заданном пороге (близкие склеены)."""
+    """alarm times at a given threshold (close ones merged)"""
     fs = tr.stats.sampling_rate
     out = []
     for on, off in trigger_onset(ratio, on_thr, on_thr / 2):
@@ -41,14 +41,14 @@ def alarms(tr, ratio, on_thr):
     return out
 
 
-# Загружаем всё один раз.
+# load everything once
 events = []
 for o in ORIGINS:
     tr, ratio = load("ev_" + o[:10])
     events.append((UTCDateTime(o), tr, ratio))
 quiet = [load(q) for q in QUIET_FILES]
 
-# Часы без землетрясений: 3 тихих часа + 15 минут перед каждым событием.
+# hours without earthquakes: 3 quiet hours + 15 minutes before each event
 quiet_hours = 3 + len(ORIGINS) * 0.25
 
 print("порог | замечено | ложных в час | медианная задержка")

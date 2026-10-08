@@ -1,2 +1,2 @@
-# Батник должен остаться с CRLF, иначе cmd путается в метках
+# the bat file must keep CRLF, otherwise cmd gets confused by the labels
 *.bat -text

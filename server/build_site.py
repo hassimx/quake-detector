@@ -1,14 +1,14 @@
-"""Сборка статического сайта для GitHub Pages: папка site/.
+"""build the static site for GitHub Pages: the site/ folder.
 
-Сайт не требует сервера: всё, что он показывает, посчитано здесь заранее тем же
-кодом, что и настоящий сервер (server/app.py, правило N=3), и сохранено в JSON.
-В браузере эти записи просто проигрываются по времени.
+The site needs no server: everything it shows is computed here in advance by the
+same code as the real server (server/app.py, rule N=3) and saved as JSON.
+In the browser these records are simply played back over time.
 
-Запуск из корня проекта (Windows):
+Run from the project root (Windows):
     .venv\\Scripts\\python -m server.build_site
-Нужны: записи в data/ (их скачали step13.py и step15.py), результаты
-results/step14_output.txt и results/step15_output.txt, интернет для каталога
-USGS (ответ кэшируется в data/site_meta.json).
+Needs: records in data/ (downloaded by step13.py and step15.py), the results
+results/step14_output.txt and results/step15_output.txt, and internet for the
+USGS catalog (the answer is cached in data/site_meta.json).
 """
 
 import json
@@ -36,15 +36,15 @@ DATA_OUT = os.path.join(SITE, "data")
 META_CACHE = os.path.join(ROOT, "data", "site_meta.json")
 STATIONS_FILE = os.path.join(ROOT, "server", "stations.json")
 MAJO = "IU.MAJO"
-MIN_NET = 3            # правило сети, как на сервере по умолчанию
-CHUNK_SEC = 10         # куски, как у replay
-EQ_WINDOW = 150        # "замечено": тревога MAJO в 0..+150 с после очага (шаг 15)
-ENV_STEP = 1.0         # огибающая сигнала: минимум/максимум за каждую секунду
-RATIO_CAP = 60.0       # STA/LTA выше этого на графике не нужен
+MIN_NET = 3            # network rule, same as the server default
+CHUNK_SEC = 10         # chunks, same as in replay
+EQ_WINDOW = 150        # "detected": a MAJO alarm within 0..+150 s after the origin time (step 15)
+ENV_STEP = 1.0         # signal envelope: min/max for every second
+RATIO_CAP = 60.0       # STA/LTA above this is not needed on the chart
 
-# Сценарии для сайта. Набор зафиксирован здесь и не подбирается под результат:
-# два события из настройки, удачные и НЕудачные примеры независимой проверки
-# (шаг 15) и тихие часы, где сеть и отсекает тревоги, и сама ошибается.
+# scenarios for the site. The set is fixed here and not tuned to the results:
+# two events from the tuning, good and BAD examples of the independent check
+# (step 15) and quiet hours where the network both rejects alarms and is wrong itself
 SCENARIOS = [
     dict(id="chiba-2021", kind="quake", group="tuning",
          origin="2021-10-07T13:41:24", tag="quake_2021-10-07",
@@ -86,9 +86,7 @@ SCENARIOS = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Каталог USGS: описание событий (кэш, чтобы сборка без интернета работала).
-# ---------------------------------------------------------------------------
+# USGS catalog: event descriptions (cached so the build works without internet)
 def usgs_meta(origins):
     cache = {}
     if os.path.exists(META_CACHE):
@@ -117,11 +115,9 @@ def usgs_meta(origins):
     return cache
 
 
-# ---------------------------------------------------------------------------
-# Записи станций сценария.
-# ---------------------------------------------------------------------------
+# station records of the scenario
 def load_traces(sc):
-    """{станция: трасса} и список станций без данных."""
+    """{station: trace} and the list of stations without data"""
     traces = {}
     if sc["kind"] == "quake":
         start = UTCDateTime(sc["origin"]) - BEFORE
@@ -145,7 +141,7 @@ def load_traces(sc):
 
 
 def envelope(tr):
-    """Сигнал после фильтра 1-8 Гц (как видит детектор) и STA/LTA по секундам."""
+    """signal after the 1-8 Hz filter (as the detector sees it) and STA/LTA per second"""
     tr_f, ratio, _ = analyze(tr)
     fs = tr.stats.sampling_rate
     n = max(1, int(round(ENV_STEP * fs)))
@@ -154,7 +150,7 @@ def envelope(tr):
     seg = data[:bins * n].reshape(bins, n)
     rseg = ratio[:bins * n].reshape(bins, n)
     lo, hi = seg.min(axis=1), seg.max(axis=1)
-    # масштаб по 99.9-му перцентилю, чтобы один выброс не сплющил всё остальное
+    # scale by the 99.9th percentile so that one spike does not flatten everything else
     scale = float(np.percentile(np.abs(data), 99.9)) or 1.0
     to_int = lambda a: np.clip(np.round(a / scale * 100), -100, 100).astype(int)
     return dict(
@@ -165,9 +161,9 @@ def envelope(tr):
 
 
 def run_through_server(traces):
-    """Гоним записи через сервер; запоминаем, КОГДА сервер узнал о тревогах и
-    когда событие стало подтверждённым (время данных конца куска)."""
-    alarms, first_conf = [], {}   # id тревоги -> когда она впервые оказалась в подтверждённом событии
+    """run the records through the server and note WHEN the server learned about each alarm
+    and when the event became confirmed (data time of the end of the chunk)"""
+    alarms, first_conf = [], {}   # alarm id -> when it first ended up in a confirmed event
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         app = create_app(os.path.join(tmp, "s.db"), MIN_NET)
         client = TestClient(app)
@@ -190,14 +186,14 @@ def run_through_server(traces):
         final_alarms = {a["id"]: a for a in client.get(
             "/api/alarms", params=dict(limit=100000)).json()}
         app.state.db.conn.close()
-    for a in alarms:   # окончательная принадлежность событию (после склеек)
+    for a in alarms:   # final event membership (after merges)
         a["event"] = final_alarms[a["id"]]["event_id"]
     events = []
     for ev in final:
         if ev["status"] != "confirmed":
             continue
-        # если событие получилось склейкой, берём самое раннее подтверждение
-        # любой его части
+        # if the event was formed by a merge, take the earliest confirmation
+        # of any of its parts
         times = [first_conf[a["id"]] for a in ev["alarms"] if a["id"] in first_conf]
         events.append(dict(
             id=ev["id"], confirmed_at=min(times) if times else None,
@@ -212,7 +208,7 @@ def run_through_server(traces):
 
 
 def outcome(sc, alarms, events, origin_ts):
-    """Итог сценария по определениям шага 15 (время очага точное, из каталога USGS)."""
+    """result of a scenario by the step 15 definitions (the origin time is exact, from the USGS catalog)"""
     if sc["kind"] == "quake":
         t = origin_ts
         majo = sorted((a for a in alarms if a["station"] == MAJO
@@ -220,8 +216,8 @@ def outcome(sc, alarms, events, origin_ts):
         ok_ids = {e["id"] for e in events}
         seen = bool(majo)
         net = seen and majo[0]["event"] in ok_ids
-        # справочно: подтвердила ли сеть хоть какое-то событие с тревогой в окне
-        # (по определению шага 15 это не засчитывается, если нет тревоги MAJO)
+        # for reference: did the network confirm any event with an alarm in the window
+        # (by the step 15 definition this does not count if there is no MAJO alarm)
         in_win = {a["event"] for a in alarms if t <= a["ts"] <= t + EQ_WINDOW}
         any_ev = [e for e in events if e["id"] in in_win]
         conf_ev = next((e for e in events if seen and e["id"] == majo[0]["event"]), None)
@@ -235,9 +231,7 @@ def outcome(sc, alarms, events, origin_ts):
                 events_without_majo=sum(MAJO not in e["stations"] for e in events))
 
 
-# ---------------------------------------------------------------------------
-# Цифры результатов: берём из выводов шагов 14 и 15, ничего не переписываем руками.
-# ---------------------------------------------------------------------------
+# result numbers: taken from the step 14 and 15 outputs, nothing is typed in by hand
 def must(pattern, text, what):
     m = re.search(pattern, text, re.M)
     if not m:
@@ -258,7 +252,7 @@ def results_summary(meta_tuning):
     hours14 = int(must(r"^Тихих часов: (\d+)\.", s14, "число часов шага 14").group(1))
     m = must(r"^\s+сервер N=3 \(поток\)\s+(\d+) из (\d+)\s+(\d+)\s+(\d+)", s14,
              "строка 'сервер N=3' таблицы Б шага 14")
-    majo14 = int(m.group(4))   # все тревоги MAJO в тихих часах шага 14
+    majo14 = int(m.group(4))   # all MAJO alarms in the quiet hours of step 14
     m = must(r"^\s+3\s+(\d+) из (\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+(\d+)\s*$", s14,
              "строка N=3 таблицы А шага 14")
     net_eq14, net_n14, _, ev14, _, _ = m.groups()
@@ -371,7 +365,7 @@ def main():
                   f, ensure_ascii=False, indent=1)
     shutil.copy(os.path.join(ROOT, "results", "step15_detection.png"),
                 os.path.join(DATA_OUT, "step15_detection.png"))
-    open(os.path.join(SITE, ".nojekyll"), "w").close()   # отдать файлы как есть
+    open(os.path.join(SITE, ".nojekyll"), "w").close()   # serve the files as they are
     print(f"Готово: {SITE}")
 
 

@@ -1,4 +1,4 @@
-"""Ищем землетрясения M5-6 в центральной Японии через каталог USGS."""
+"""find earthquakes of M5-6 in central Japan using the USGS catalog"""
 
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client

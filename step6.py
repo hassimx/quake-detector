@@ -1,4 +1,4 @@
-"""Шаг 6: показываем ВСЕ сырые тревоги, без паузы (cooldown)."""
+"""step 6: show ALL raw alarms, without a pause (cooldown)"""
 
 from obspy import read, UTCDateTime
 from obspy.signal.trigger import classic_sta_lta, trigger_onset

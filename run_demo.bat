@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
-rem Демо одним щелчком: окружение, записи, сервер, браузер, воспроизведение.
-rem Файл должен лежать в корне проекта. Строки заканчиваются на CRLF (так нужно cmd).
+rem one-click demo: environment, records, server, browser, replay
+rem the file must be in the project root. Lines end with CRLF (cmd needs that)
 set PYTHONIOENCODING=utf-8
 cd /d "%~dp0"
 title Quake Detector - demo
@@ -11,7 +11,7 @@ echo   Quake Detector: демо одним щелчком
 echo ==================================================
 echo.
 
-rem --- 1. Виртуальное окружение ---
+rem 1. virtual environment
 if exist ".venv\Scripts\python.exe" goto have_venv
 set "PY="
 where py >nul 2>nul && set "PY=py -3"
@@ -22,7 +22,7 @@ echo [1/6] Создаю виртуальное окружение .venv ...
 if errorlevel 1 goto venv_failed
 :have_venv
 
-rem --- 2. Библиотеки (только в первый раз, потом отметка .demo_ready) ---
+rem 2. libraries (only the first time, then the .demo_ready mark)
 if exist ".venv\.demo_ready" goto have_packages
 echo [2/6] Устанавливаю библиотеки, это только в первый раз, нужен интернет ...
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt -r requirements-server.txt
@@ -30,18 +30,18 @@ if errorlevel 1 goto pip_failed
 echo ok> ".venv\.demo_ready"
 :have_packages
 
-rem --- 3. Записи станций ---
+rem 3. station records
 echo [3/6] Проверяю записи станций в папке data ...
 ".venv\Scripts\python.exe" -m server.prepare_demo
 if errorlevel 1 goto prepare_failed
 
-rem --- 4. Чистый старт ---
+rem 4. clean start
 echo [4/6] Чистый старт: удаляю старую базу ...
 if exist "server\quake.db" del /q "server\quake.db"
 ".venv\Scripts\python.exe" -m server.wait_server --free
 if errorlevel 1 goto port_busy
 
-rem --- 5. Сервер в отдельном окне, потом браузер ---
+rem 5. server in a separate window, then the browser
 echo [5/6] Запускаю сервер в отдельном окне и жду, пока он оживёт ...
 start "Quake Detector SERVER" cmd /k .venv\Scripts\python.exe -m uvicorn server.app:create_app --factory --port 8000
 ".venv\Scripts\python.exe" -m server.wait_server 90
@@ -49,7 +49,7 @@ if errorlevel 1 goto server_failed
 echo Открываю страницу в браузере: http://127.0.0.1:8000
 start "" "http://127.0.0.1:8000"
 
-rem --- 6. Воспроизведение записей ---
+rem 6. replay of the records
 echo [6/6] Воспроизвожу записи землетрясения 2021-10-07 в 60 раз быстрее ...
 echo      Смотрите страницу: события появятся сами.
 echo.

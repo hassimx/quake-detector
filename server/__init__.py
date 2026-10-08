@@ -1,1 +1,1 @@
-"""Бэкенд quake-detector: приём потоков со станций, детектор, правило сети, база."""
+"""quake-detector backend: station streams in, detector, network rule, database"""

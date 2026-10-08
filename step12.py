@@ -1,21 +1,22 @@
-"""Шаг 12: работает ли правило "тревога MAJO подтверждена соседней станцией"?
+"""step 12: does the rule "a MAJO alarm is confirmed by a neighbor station" work?
 
-Правило: тревога на IU.MAJO считается подтверждённой, если хотя бы одна из
-4 соседних станций (JP.JGF, JP.JSD, G.INU, PS.TSK) дала свою тревогу в
-пределах +-60 сек от неё.
+Rule: an alarm on IU.MAJO is considered confirmed if at least one of the
+4 neighbor stations (JP.JGF, JP.JSD, G.INU, PS.TSK) gave its own alarm
+within +-60 s of it.
 
-Что проверяем:
-  1) 10 землетрясений (даты очагов из step7.py), запись от -15 до +10 минут
-     вокруг очага: сколько из них правило подтверждает;
-  2) 3 тихих часа: сколько тревог MAJO правило оставляет (это ложные тревоги,
-     которые правило не отсекло) и сколько отсеивает.
-Порог на MAJO остаётся 10 (как в step11). Для соседей пробуем 5, 7 и 10.
+What we check:
+  1) 10 earthquakes (origin dates from step7.py), a record from -15 to +10
+     minutes around the origin: how many of them the rule confirms;
+  2) 3 quiet hours: how many MAJO alarms the rule keeps (these are false alarms
+     the rule did not filter out) and how many it filters out.
+The MAJO threshold stays 10 (as in step11). For the neighbors we try 5, 7 and 10.
 
-Детектор не меняется: загрузку и обработку берём из step11.py (импортом).
-step11.analyze считает кривую STA/LTA, а тревоги для разных порогов соседей
-мы получаем из неё заново (то же окно STA 1 с / LTA 30 с, фильтр 1-8 Гц,
-тот же порог выключения = порог / 2, та же склейка тревог ближе 60 сек).
-Весь вывод сохраняется в results/step12_output.txt.
+The detector is not changed: loading and processing come from step11.py (by
+import). step11.analyze computes the STA/LTA curve, and the alarms for
+different neighbor thresholds are obtained from it again (the same STA 1 s /
+LTA 30 s windows, 1-8 Hz filter, the same switch-off threshold = threshold / 2,
+the same merging of alarms closer than 60 s).
+All output is saved to results/step12_output.txt.
 """
 
 import os
@@ -28,17 +29,17 @@ from step11 import GROUP_SEC, MATCH_SEC, ON_THR, Report, analyze, fetch_trace
 
 OUTPUT_FILE = os.path.join("results", "step12_output.txt")
 
-# Соседние станции и их вертикальный канал (как нашёл step11).
+# neighbor stations and their vertical channel (as step11 found)
 NEIGHBORS = {
     "JP.JGF": "BHZ",
     "JP.JSD": "BHZ",
     "G.INU": "BHZ",
     "PS.TSK": "HHZ",
 }
-NEIGHBOR_THRESHOLDS = (5, 7, 10)  # пороги, которые пробуем для соседей
+NEIGHBOR_THRESHOLDS = (5, 7, 10)  # thresholds we try for the neighbors
 
-# Время очагов (UTC) скопировано из step7.py: тот файл нельзя импортировать
-# (он выполняется целиком при импорте: скачивает данные и печатает итоги).
+# origin times (UTC) copied from step7.py: that file cannot be imported
+# (it runs completely on import: downloads data and prints the results)
 ORIGINS = [
     "2011-03-11T05:46:24",
     "2021-10-07T13:41:24",
@@ -56,14 +57,14 @@ QUIET_HOURS = [
     "2019-09-20T10:00:00",
     "2018-03-12T02:00:00",
 ]
-BEFORE, AFTER = 15 * 60, 10 * 60  # окно вокруг очага: -15 ... +10 минут
-QUIET_SEC = 3600                  # тихий час длится ровно час
-EQ_DETECT_SEC = 120               # MAJO "заметила" землетрясение (как в step7)
-COVER_TOL = 2                     # допуск при проверке покрытия записью, сек
+BEFORE, AFTER = 15 * 60, 10 * 60  # window around the origin: -15 ... +10 minutes
+QUIET_SEC = 3600                  # a quiet hour lasts exactly one hour
+EQ_DETECT_SEC = 120               # MAJO "detected" the earthquake (as in step7)
+COVER_TOL = 2                     # tolerance when checking record coverage, s
 
 
 def majo_window(name, start, end):
-    """Запись MAJO из файла, который уже лежит в репозитории (как в step7)."""
+    """MAJO record from the file that is already in the repository (as in step7)"""
     st = read(f"{name}.mseed")
     st.merge(fill_value=0)
     tr = st[0]
@@ -72,9 +73,9 @@ def majo_window(name, start, end):
 
 
 def neighbor_trace(client, key, start, end):
-    """Запись соседа: сначала нужный канал, потом второй (BHZ/HHZ).
+    """neighbor record: the needed channel first, then the second one (BHZ/HHZ).
 
-    Возвращает (трасса, None) или (None, причина). Не падает.
+    Returns (trace, None) or (None, reason). Does not raise.
     """
     first = NEIGHBORS[key]
     other = "HHZ" if first == "BHZ" else "BHZ"
@@ -88,7 +89,7 @@ def neighbor_trace(client, key, start, end):
 
 
 def alarms_at(tr, ratio, thr):
-    """Тревоги по готовой кривой STA/LTA при заданном пороге (порог выкл. = thr/2)."""
+    """alarms from a ready STA/LTA curve at a given threshold (switch-off threshold = thr/2)"""
     fs = tr.stats.sampling_rate
     alarms = []
     for on, _off in trigger_onset(ratio, thr, thr / 2):
@@ -99,17 +100,17 @@ def alarms_at(tr, ratio, thr):
 
 
 def covers(tr, alarm):
-    """Покрывает ли запись весь интервал +-60 сек вокруг тревоги."""
+    """does the record cover the whole +-60 s interval around the alarm"""
     return (tr.stats.starttime <= alarm - MATCH_SEC + COVER_TOL
             and tr.stats.endtime >= alarm + MATCH_SEC - COVER_TOL)
 
 
 def process(report, client, label, majo_tr, start, end):
-    """Один отрезок (землетрясение или тихий час): MAJO + 4 соседа.
+    """one segment (an earthquake or a quiet hour): MAJO + 4 neighbors.
 
-    Возвращает словарь: тревоги MAJO и по каждому соседу кривую STA/LTA.
+    Returns a dict: the MAJO alarms and the STA/LTA curve of every neighbor.
     """
-    _, _, majo_alarms = analyze(majo_tr)  # порог 10, как в step11
+    _, _, majo_alarms = analyze(majo_tr)  # threshold 10, as in step11
     report.line(f"  MAJO: запись {majo_tr.stats.npts / majo_tr.stats.sampling_rate:.0f} с, "
                 f"тревог (порог {ON_THR}): {len(majo_alarms)}")
     stations = {}
@@ -127,11 +128,11 @@ def process(report, client, label, majo_tr, start, end):
 
 
 def judge(data, alarm, thr):
-    """Статус тревоги MAJO при пороге соседей thr.
+    """status of a MAJO alarm at neighbor threshold thr.
 
-    "подтверждена"  - хотя бы одна соседняя станция сработала в +-60 с;
-    "отсеяна"       - данные соседей были, но никто не сработал;
-    "нет данных"    - ни одна соседняя станция не покрывает окно +-60 с.
+    "подтверждена" (confirmed)  - at least one neighbor station fired within +-60 s;
+    "отсеяна" (filtered out)    - neighbor data was there, but nobody fired;
+    "нет данных" (no data)      - no neighbor station covers the +-60 s window.
     """
     judged = False
     for tr, ratio in data["stations"].values():
@@ -152,9 +153,9 @@ def main():
     report.line(f"Пороги соседей: {', '.join(map(str, NEIGHBOR_THRESHOLDS))}")
     report.line()
 
-    # --- 1. Землетрясения ---
+    # 1. earthquakes
     report.line("=== Землетрясения (запись от -15 до +10 минут вокруг очага) ===")
-    quakes = []  # (дата, данные, тревога MAJO, замечающая землетрясение или None)
+    quakes = []  # (date, data, MAJO alarm, the alarm that detected the earthquake or None)
     for text in ORIGINS:
         origin = UTCDateTime(text)
         report.line(f"{text}")
@@ -165,8 +166,8 @@ def main():
             report.line(f"  MAJO: не удалось прочитать запись: {err}")
             continue
         data = process(report, client, text, majo_tr, start, end)
-        # Тревога, которой MAJO "заметила" землетрясение: первая в 0..+120 с
-        # после очага (то же правило, что в step7).
+        # the alarm by which MAJO "detected" the earthquake: the first one in 0..+120 s
+        # after the origin (the same rule as in step7)
         hits = [t for t in data["majo"] if origin <= t <= origin + EQ_DETECT_SEC]
         quakes.append((text, data, hits[0] if hits else None))
         if hits:
@@ -176,9 +177,9 @@ def main():
             report.line("  MAJO НЕ заметила землетрясение (порог 10)")
     report.line()
 
-    # --- 2. Тихие часы ---
+    # 2. quiet hours
     report.line("=== Тихие часы (по часу) ===")
-    quiet = []  # (час, данные)
+    quiet = []  # (hour, data)
     for text in QUIET_HOURS:
         t0 = UTCDateTime(text)
         report.line(f"{text}")
@@ -191,7 +192,7 @@ def main():
                                     t0, t0 + QUIET_SEC)))
     report.line()
 
-    # --- 3. Таблицы по порогам ---
+    # 3. tables by threshold
     n_quakes = len(quakes)
     majo_detected = sum(1 for _, _, a in quakes if a is not None)
     report.line(f"Землетрясений обработано: {n_quakes} из {len(ORIGINS)}; "

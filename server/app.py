@@ -1,12 +1,12 @@
-"""HTTP-сервер: принимает куски записей станций и отдаёт тревоги и события.
+"""HTTP server: takes chunks of station records and returns alarms and events.
 
-Запуск (из корня проекта):
+Run (from the project root):
     .venv/bin/uvicorn server.app:create_app --factory --port 8000
-Настройки через переменные окружения:
-    QUAKE_DB            путь к файлу базы (по умолчанию server/quake.db)
-    QUAKE_MIN_STATIONS  сколько станций нужно для подтверждения события
-                        (по умолчанию 3; в шаге 14 при 3 было 0.21 ложных
-                        событий в час против 0.50 при 2)
+Settings through environment variables:
+    QUAKE_DB            path to the database file (default server/quake.db)
+    QUAKE_MIN_STATIONS  how many stations are needed to confirm an event
+                        (default 3; in step 14, 3 gave 0.21 false events per
+                        hour against 0.50 with 2)
 """
 
 import json
@@ -25,12 +25,12 @@ from server.network import link_alarm
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB = os.path.join(HERE, "quake.db")
 STATIONS_FILE = os.path.join(HERE, "stations.json")
-INDEX_FILE = os.path.join(HERE, "..", "web", "index.html")  # страница для браузера
-DEFAULT_MIN_STATIONS = 3  # по результатам шага 14 (results/step14_output.txt)
+INDEX_FILE = os.path.join(HERE, "..", "web", "index.html")  # page for the browser
+DEFAULT_MIN_STATIONS = 3  # chosen from the step 14 results (results/step14_output.txt)
 
 
 class Chunk(BaseModel):
-    """Кусок записи станции: время первого отсчёта, частота и сами отсчёты."""
+    """a chunk of a station record: time of the first sample, rate and the samples themselves"""
     starttime: str
     sampling_rate: float
     samples: list[float]
@@ -50,14 +50,14 @@ def create_app(db_path=None, min_stations=None):
             db.add_station(s["code"], s["name"], s["lat"], s["lon"])
     db.commit()
     known = {s["code"] for s in db.stations()}
-    detectors = {code: StreamDetector() for code in known}  # состояние в памяти
+    detectors = {code: StreamDetector() for code in known}  # state in memory
     lock = threading.Lock()
 
     app = FastAPI(title="quake-detector")
 
     @app.get("/", include_in_schema=False)
     def index():
-        """Веб-страница с картой и списком событий (web/index.html)."""
+        """web page with the map and the event list (web/index.html)"""
         return FileResponse(INDEX_FILE, media_type="text/html")
 
     @app.get("/api/config")
@@ -111,5 +111,5 @@ def create_app(db_path=None, min_stations=None):
                            UTCDateTime(end).timestamp, max_points)
         return dict(station=station, times=[iso(x) for x in t], values=v)
 
-    app.state.db = db  # чтобы скрипты (evaluate.py) могли закрыть базу
+    app.state.db = db  # so scripts (evaluate.py) can close the database
     return app

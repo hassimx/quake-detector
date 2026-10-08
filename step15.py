@@ -1,22 +1,22 @@
-"""Шаг 15: НЕЗАВИСИМАЯ проверка на новых землетрясениях и новых тихих часах.
+"""step 15: INDEPENDENT check on new earthquakes and new quiet hours.
 
-Все прежние цифры (шаги 7-14) получены на событиях, на которых подбирались
-настройки. Здесь берём события, которых мы раньше не видели, и ничего не
-подгоняем: определения ниже записаны до запуска и не меняются, правило сети
-(N=3, server/network.py), детектор (step11) и пороги остаются прежними. Если
-результат плохой, он так и записывается.
+All earlier numbers (steps 7-14) were obtained on events on which the
+settings were tuned. Here we take events we have not seen before and do not
+fit anything: the definitions below are written down before the run and do not
+change, the network rule (N=3, server/network.py), the detector (step11) and
+the thresholds stay the same. If the result is bad, it is recorded as it is.
 
-Что делает скрипт:
-  1) из каталога USGS выбирает до 60 новых землетрясений M4.5-5.7 (по 20 на
-     интервал магнитуды) и 150 новых тихих часов (random.seed(7));
-  2) качает записи MAJO и 4 соседних станций в data/ (можно прервать и запустить
-     снова: скачанное не качается повторно);
-  3) гонит каждый сценарий через сервер (TestClient, правило N=3);
-  4) считает доли замеченных и подтверждённых землетрясений с интервалами
-     Уилсона и ложные срабатывания в час; рисует results/step15_detection.png.
+What the script does:
+  1) picks up to 60 new earthquakes M4.5-5.7 from the USGS catalog (20 per
+     magnitude bin) and 150 new quiet hours (random.seed(7));
+  2) downloads the records of MAJO and 4 neighbor stations into data/ (it can be
+     interrupted and started again: what is downloaded is not downloaded twice);
+  3) runs every scenario through the server (TestClient, rule N=3);
+  4) counts the shares of detected and confirmed earthquakes with Wilson
+     intervals and the false alarms per hour; draws results/step15_detection.png.
 
-Запуск (Windows):  .venv\\Scripts\\python step15.py
-Вывод: results/step15_output.txt
+Run (Windows):  .venv\\Scripts\\python step15.py
+Output: results/step15_output.txt
 """
 
 import bisect
@@ -49,11 +49,9 @@ PLOT_FILE = os.path.join("results", "step15_detection.png")
 STEP13_FILE = os.path.join("results", "step13_output.txt")
 DATA_DIR = "data"
 MAJO = "IU.MAJO"
-MAJO_LAT, MAJO_LON = 36.54567, 138.20406   # как в server/stations.json
+MAJO_LAT, MAJO_LON = 36.54567, 138.20406   # as in server/stations.json
 
-# ---------------------------------------------------------------------------
-# Определения: пишутся в начало results/step15_output.txt ДО загрузок.
-# ---------------------------------------------------------------------------
+# definitions: written at the start of results/step15_output.txt BEFORE any downloads
 DEFINITIONS = """\
 ОПРЕДЕЛЕНИЯ (записаны до запуска, после запуска не меняются)
   1. "Замечено": у MAJO есть тревога в пределах 0..+150 с после времени очага.
@@ -79,26 +77,24 @@ DEFINITIONS = """\
     точный пуассоновский интервал 95% и бутстрап по часам (seed 7).
 """
 
-# Интервалы магнитуды и расстояния (границы заданы заранее)
+# magnitude and distance bins (the borders are set in advance)
 MAG_BINS = [("4.5-4.9", 4.5, 5.0), ("5.0-5.3", 5.0, 5.4), ("5.4-5.7", 5.4, 5.8)]
 DIST_BINS = [("<150 км", 0, 150), ("150-300 км", 150, 300), (">300 км", 300, 1e9)]
-PER_BIN = 20            # событий на интервал магнитуды
+PER_BIN = 20            # events per magnitude bin
 N_HOURS = 150
 SEED = 7
-EQ_WINDOW = 150         # "замечено": 0..+150 с после очага
-MIN_EQ_MAJO_SEC = 0.98 * (BEFORE + AFTER)   # запись MAJO на землетрясение: >= 98% окна
-MIN_NET = 3             # правило сети (N=3)
+EQ_WINDOW = 150         # "detected": 0..+150 s after the origin
+MIN_EQ_MAJO_SEC = 0.98 * (BEFORE + AFTER)   # MAJO record for an earthquake: >= 98% of the window
+MIN_NET = 3             # network rule (N=3)
 CHUNK_SEC = 10
 WORKERS_DOWNLOAD = 6
 WORKERS_RUN = 4
-RUN_VERSION = "1"       # версия кэша результатов прогона (data/step15_runs)
+RUN_VERSION = "1"       # version of the run-results cache (data/step15_runs)
 
 
-# ---------------------------------------------------------------------------
-# Статистика.
-# ---------------------------------------------------------------------------
+# statistics
 def wilson(k, n, z=1.96):
-    """Доверительный интервал Уилсона (95%) для доли k из n."""
+    """Wilson confidence interval (95%) for the share k out of n"""
     if n == 0:
         return float("nan"), float("nan")
     p = k / n
@@ -109,7 +105,7 @@ def wilson(k, n, z=1.96):
 
 
 def _poisson_cdf(k, mu):
-    # через логарифмы: при больших k mu**i и i! не помещаются в float
+    # via logarithms: for large k, mu**i and i! do not fit into a float
     if mu <= 0:
         return 1.0
     return min(1.0, sum(math.exp(-mu + i * math.log(mu) - math.lgamma(i + 1))
@@ -117,7 +113,7 @@ def _poisson_cdf(k, mu):
 
 
 def poisson_ci(k, alpha=0.05):
-    """Точный (Гарвуд) интервал для среднего числа событий при k наблюдениях."""
+    """exact (Garwood) interval for the mean number of events given k observations"""
     def bisect_mu(f, lo, hi):
         for _ in range(200):
             mid = (lo + hi) / 2
@@ -131,18 +127,16 @@ def poisson_ci(k, alpha=0.05):
 
 
 def bootstrap_rate_ci(counts, reps=10000):
-    """Интервал для числа срабатываний в час: пересэмплируем ЧАСЫ целиком."""
+    """interval for the number of alarms per hour: we resample whole HOURS"""
     rng = np.random.default_rng(SEED)
     counts = np.asarray(counts, dtype=float)
     means = rng.choice(counts, size=(reps, len(counts))).mean(axis=1)
     return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 
-# ---------------------------------------------------------------------------
-# Каталог USGS (кэш в data/, чтобы повторный запуск не ходил в каталог).
-# ---------------------------------------------------------------------------
+# USGS catalog (cached in data/ so a second run does not query the catalog)
 def load_catalog(name, **query):
-    """События каталога по годам 2016-2024: список словарей (время, M, место)."""
+    """catalog events by year 2016-2024: a list of dicts (time, M, place)"""
     path = os.path.join(DATA_DIR, f"step15_catalog_{name}.json")
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
@@ -173,11 +167,11 @@ def load_catalog(name, **query):
 
 
 class QuietChecker:
-    """Те же проверки, что step13.catalog_is_quiet, но по уже скачанным каталогам."""
+    """the same checks as step13.catalog_is_quiet, but on the catalogs already downloaded"""
 
     def __init__(self, regional, world):
-        self.reg = [e["time"] for e in regional]   # M4+ в рамке, отсортировано
-        self.world = [e["time"] for e in world]    # M5.5+ в мире, отсортировано
+        self.reg = [e["time"] for e in regional]   # M4+ in the box, sorted
+        self.world = [e["time"] for e in world]    # M5.5+ in the world, sorted
 
     @staticmethod
     def _any(times, lo, hi):
@@ -190,11 +184,9 @@ class QuietChecker:
                     or self._any(self.world, ts - 1800, ts))
 
 
-# ---------------------------------------------------------------------------
-# Загрузка записей: возобновляемая, потокобезопасная.
-# ---------------------------------------------------------------------------
+# downloading records: resumable, thread-safe
 class DownloadError(RuntimeError):
-    """Сетевая ошибка: прерываем запуск, чтобы не исключить событие по ошибке."""
+    """network error: abort the run so as not to exclude an event by mistake"""
 
 
 _local = threading.local()
@@ -207,7 +199,7 @@ def waves_client():
 
 
 def get_record(key, start, end, tag):
-    """(трасса, None) или (None, причина). Результат "нет данных" тоже кэшируется."""
+    """(trace, None) or (None, reason). The "no data" result is cached too"""
     path = cache_path(key, tag)
     if os.path.exists(path):
         return read(path)[0], None
@@ -225,14 +217,14 @@ def get_record(key, start, end, tag):
             tr.write(path, format="MSEED")
             return tr, None
         if "ОШИБКА" not in note:
-            open(path + ".nodata", "w").close()   # сервер ответил "данных нет"
+            open(path + ".nodata", "w").close()   # the server answered "no data"
             return None, note
         time.sleep(5 * (attempt + 1))
     raise DownloadError(f"{key} {tag}: {note}")
 
 
 def fetch_many(jobs):
-    """jobs: список (key, start, end, tag); возвращает {(key, tag): (трасса, причина)}."""
+    """jobs: a list of (key, start, end, tag); returns {(key, tag): (trace, reason)}"""
     with ThreadPoolExecutor(max_workers=WORKERS_DOWNLOAD) as pool:
         futures = {(k, tag): pool.submit(get_record, k, s, e, tag)
                    for k, s, e, tag in jobs}
@@ -243,11 +235,9 @@ def majo_ok(tr, need_sec):
     return tr is not None and tr.stats.npts / tr.stats.sampling_rate >= need_sec
 
 
-# ---------------------------------------------------------------------------
-# Выбор землетрясений.
-# ---------------------------------------------------------------------------
+# choosing earthquakes
 def eligible_events(regional, report):
-    """Кандидаты по условиям, заданным заранее. Печатает воронку отбора."""
+    """candidates by the conditions set in advance. Prints the selection funnel"""
     times = [e["time"] for e in regional]
     big = [e["time"] for e in regional if e["mag"] >= 5.5]
     known = [UTCDateTime(o).timestamp for o in ORIGINS]
@@ -262,7 +252,7 @@ def eligible_events(regional, report):
         if any(abs(t - k) < 3600 for k in known):
             funnel["step13"] += 1
             continue
-        # другое M4+ в окне записи +-10 минут: [t-900-600, t+600+600]; минус само событие
+        # another M4+ in the record window +-10 minutes: [t-900-600, t+600+600]; minus the event itself
         near = (bisect.bisect_right(times, t + AFTER + 600)
                 - bisect.bisect_left(times, t - BEFORE - 600)) - 1
         if near > 0:
@@ -288,7 +278,7 @@ def quake_tag(e):
 
 
 def pick_events(candidates, report):
-    """До PER_BIN событий на интервал магнитуды; нет записи MAJO: берём следующее."""
+    """up to PER_BIN events per magnitude bin; no MAJO record: take the next one"""
     random.seed(SEED)
     chosen = []
     for name, lo, hi in MAG_BINS:
@@ -313,9 +303,7 @@ def pick_events(candidates, report):
     return chosen
 
 
-# ---------------------------------------------------------------------------
-# Выбор тихих часов.
-# ---------------------------------------------------------------------------
+# choosing quiet hours
 def pick_hours(checker, report):
     random.seed(SEED)
     used13 = set(quiet_hours_from_step13(STEP13_FILE))
@@ -340,7 +328,7 @@ def pick_hours(checker, report):
         stats["majo"] += len(batch) - len(with_majo)
         nb = fetch_many([(k, t0, t0 + HOUR_SEC, tag(t0))
                          for t0 in with_majo for k in NEIGHBORS])
-        for t0 in with_majo:   # принимаем в порядке выбора, пока не наберём 150
+        for t0 in with_majo:   # accept in the order of selection until we have 150
             if len(accepted) >= N_HOURS:
                 break
             have = [k for k in NEIGHBORS if nb[(k, tag(t0))][0] is not None]
@@ -355,11 +343,9 @@ def pick_hours(checker, report):
     return accepted
 
 
-# ---------------------------------------------------------------------------
-# Прогон через сервер (в отдельных процессах).
-# ---------------------------------------------------------------------------
+# running through the server (in separate processes)
 def run_job(job):
-    """Один сценарий через сервер с правилом N=3. job = (тег, {станция: файл})."""
+    """one scenario through the server with rule N=3. job = (tag, {station: file})"""
     tag, files = job
     cache = os.path.join(DATA_DIR, "step15_runs", f"{RUN_VERSION}_{tag}.json")
     if os.path.exists(cache):
@@ -389,7 +375,7 @@ def run_job(job):
 
 
 def files_for(tag):
-    """Файлы станций сценария, которые реально скачаны (с данными)."""
+    """station files of the scenario that were really downloaded (with data)"""
     files = {}
     for key in [MAJO] + list(NEIGHBORS):
         path = cache_path(key, tag)
@@ -398,11 +384,9 @@ def files_for(tag):
     return files
 
 
-# ---------------------------------------------------------------------------
-# Оценка результатов.
-# ---------------------------------------------------------------------------
+# evaluating the results
 def judge_quake(e, res):
-    """Показатели одного землетрясения (определения 1 и 2)."""
+    """numbers of one earthquake (definitions 1 and 2)"""
     t = e["time"]
     ok = {ev["id"] for ev in res["events"] if ev["status"] == "confirmed"}
     in_win = sorted((a for a in res["alarms"]
@@ -417,7 +401,7 @@ def judge_quake(e, res):
 
 
 def table_rows(items, bins, key):
-    """Строки таблицы: (метка, n, замечено, сеть) по интервалам."""
+    """table rows: (label, n, detected, network) per bin"""
     rows = []
     for name, lo, hi in bins:
         sel = [i for i in items if lo <= key(i) < hi]
@@ -434,7 +418,7 @@ def fmt_share(k, n):
 
 
 def plot_detection(items, path):
-    """График: доля замеченных против магнитуды (интервалы Уилсона 95%)."""
+    """plot: share detected against magnitude (Wilson intervals 95%)"""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -471,13 +455,12 @@ def plot_detection(items, path):
     plt.close(fig)
 
 
-# ---------------------------------------------------------------------------
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
     out = Report(OUTPUT_FILE)
     L = out.line
     for line in DEFINITIONS.rstrip("\n").split("\n"):
-        L(line)          # определения записаны до любых загрузок
+        L(line)          # the definitions are written before any downloads
     L()
     try:
         run(out)
@@ -498,7 +481,7 @@ def run(out):
     L(f"События каталога 2016-2024: M4+ в рамке {len(regional)}, "
       f"M5.5+ в мире {len(world)}")
 
-    # --- землетрясения ---
+    # earthquakes
     L()
     L("=== Выбор землетрясений ===")
     candidates = eligible_events(regional, out)
@@ -506,14 +489,14 @@ def run(out):
     L(f"Землетрясений в выборке: {len(events)}")
     jobs = [(k, UTCDateTime(e["time"]) - BEFORE, UTCDateTime(e["time"]) + AFTER,
              quake_tag(e)) for e in events for k in NEIGHBORS]
-    fetch_many(jobs)   # соседи; нет данных у станции - не ошибка
+    fetch_many(jobs)   # neighbors; no data at a station is not an error
 
-    # --- тихие часы ---
+    # quiet hours
     L()
     L("=== Выбор тихих часов ===")
     hours = pick_hours(QuietChecker(regional, world), out)
 
-    # --- прогон через сервер ---
+    # run through the server
     L()
     L("=== Прогон через сервер (правило N=3) ===")
     q_jobs = [(quake_tag(e), files_for(quake_tag(e)))
@@ -526,7 +509,7 @@ def run(out):
         h_res = list(pool.map(run_job, h_jobs))
     L(f"Прогнано сценариев: {len(q_res)} землетрясений и {len(h_res)} часов")
 
-    # --- землетрясения: результаты ---
+    # earthquakes: results
     L()
     L("=== Землетрясения: по каждому событию ===")
     items = []
@@ -573,7 +556,7 @@ def run(out):
     plot_detection(items, PLOT_FILE)
     L(f"  График: {PLOT_FILE}")
 
-    # --- тихие часы: результаты ---
+    # quiet hours: results
     L()
     L("=== Тихие часы: по часам с тревогами ===")
     majo_counts, net_counts, no_majo = [], [], 0
